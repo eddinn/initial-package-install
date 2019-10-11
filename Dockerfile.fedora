@@ -1,0 +1,3 @@
+FROM fedora:30
+COPY ./pkg-install.sh .
+RUN ./pkg-install.sh
