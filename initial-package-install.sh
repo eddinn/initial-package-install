@@ -48,6 +48,7 @@ setup_ubuntu () {
    puppet-lint
    python3
    python3-pip
+   python3-venv
    qbittorrent
    remmina
    rkhunter
