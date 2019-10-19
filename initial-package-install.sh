@@ -11,7 +11,7 @@
 # Break the script down to specific app installs with dotfiles and addons
 # vscode addon installs
 # Hexchat config
-# Steam autoexec.cfg
+# Steam CSGO autoexec.cfg
 # Vim dotfiles
 
 # Function for Ubuntu install
@@ -67,7 +67,7 @@ setup_ubuntu () {
 
   # Install all the defines user packages via apt with suggested packages
   echo "Installing user packages"
-  sudo apt install -y --install-suggests "${apt_packages[@]}"
+  sudo apt install -y "${apt_packages[@]}"
 
   # Install latest stable Google Chrome, if not installed
   echo "Installing Google Chrome"
