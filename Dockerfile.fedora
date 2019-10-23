@@ -1,3 +1,0 @@
-FROM fedora:30
-COPY ./initial-package-install.sh .
-RUN ./initial-package-install.sh

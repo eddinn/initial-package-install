@@ -1,4 +1,0 @@
-FROM ubuntu:19.04
-RUN apt-get install -y sudo wget curl
-COPY ./initial-package-install.sh .
-RUN ./initial-package-install.sh
