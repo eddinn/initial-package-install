@@ -6,30 +6,30 @@ Scripts that installs selective base user packages and extensions for initial se
 
 ## Files TOC
 
-1. Root:
-  ./initial-package-install.sh
-  ./post-initial.sh
-2. Extensions dir:
-  ./ext/
-  ./ext/gnome-ext.sh
-  ./ext/vscode-ext.sh
-3. Applications dir:
-  ./apps/
-  ./apps/pip.sh
-  ./apps/snap.sh
-4. Dotfiles dir:
-  ./dots/
-  ./dots/bash/.profile
-  ./dots/bash/.bashrc
-  ./dots/bin/
-  ./dots/bin/bin/
-  ./dots/bin/bin/apt-cleanup.sh
-  ./dots/bin/bin/remove-old-snaps.sh
-  .dots/git/.gitconfig
-  .dots/LICENSE
-  .dots/README.md
-  .dots/stowit.sh
-  .dots/zsh/.zshrc
+* Root:
+  * ./initial-package-install.sh
+  * ./post-initial.sh
+* Extensions dir:
+  * ./ext/
+  * ./ext/gnome-ext.sh
+  * ./ext/vscode-ext.sh
+* Applications dir:
+  * ./apps/
+  * ./apps/pip.sh
+  * ./apps/snap.sh
+* Dotfiles dir:
+  * ./dots/
+  * ./dots/bash/.profile
+  * ./dots/bash/.bashrc
+  * ./dots/bin/
+  * ./dots/bin/bin/
+  * ./dots/bin/bin/apt-cleanup.sh
+  * ./dots/bin/bin/remove-old-snaps.sh
+  * .dots/git/.gitconfig
+  * .dots/LICENSE
+  * .dots/README.md
+  * .dots/stowit.sh
+  * .dots/zsh/.zshrc
 
 ### Basic usage
 
