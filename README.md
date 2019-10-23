@@ -7,8 +7,6 @@ Scripts that installs selective base user packages and extensions for initial se
 ## Files TOC
 
 1. Root:
-  ./Dockerfile.fedora # For testing
-  ./Dockerfile.ubuntu # For testing
   ./initial-package-install.sh
   ./post-initial.sh
 2. Extensions dir:
@@ -40,7 +38,7 @@ Scripts that installs selective base user packages and extensions for initial se
 ```bash
 git clone https://github.com/eddinn/initial-package-install.git
 cd ./initial-package-install
-bash ./initial-package-install.sh
+bash ./initial-package-install.sh && bash ./post-initial.sh
 ```
 
 #### If `git` is not already installed on the system
@@ -49,4 +47,10 @@ bash ./initial-package-install.sh
 # Try curl, else fall back to wget
 curl -L -O https://raw.githubusercontent.com/eddinn/initial-package-install/master/initial-package-install.sh || wget -L -O https://raw.githubusercontent.com/eddinn/initial-package-install/master/initial-package-install.sh
 bash ./initial-package-install.sh
+
+# Now we have git, so lets clone the repo and finish the setup
+rm -Rf ./initial-package-install.sh
+git clone https://github.com/eddinn/initial-package-install.git
+cd ./initial-package-install
+bash ./post-initial.sh
 ```
