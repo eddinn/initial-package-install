@@ -2,11 +2,9 @@
 
 # Author: Edvin Dunaway
 # Contact: edvin@eddinn.net
-# Version: 0.1.10
+# Version: 0.2
 
 # TODO:
-# Combine with setup.sh
-# Break the script down to specific app installs with dotfiles and addons
 
 # Function for Ubuntu install
 setup_ubuntu () {
@@ -187,48 +185,5 @@ elif [ "$OS" == "fedora" ]
 then
  setup_fedora
 fi
-
-# Define Python3 Pip packages to install
-pip_packages=(
- setuptools
- wheel
- ansible
- ansible-lint
- ansible-tower-cli
- pywinrm
- testresources
-)
-
-# Install Python3 pip packages
-echo -e '\nUpgrading pip3 and installing Python3 packages'
-# First, upgrade pip to latest version
-sudo -H pip3 install pip --upgrade
-# Install packages to user space
-pip3 install --user "${pip_packages[@]}"
-
-# Define Snap packages to install
-snap_packages=(
- discord
- gitkraken
- spotify
-)
-
-# Install user snap packages
-echo -e '\nInstalling VSCode and Slack with --classic'
-sudo snap install code --classic
-sudo snap install slack --classic
-echo -e '\nInstalling Snap packages'
-# Install the rest of the snap packages
-for snaps in "${snap_packages[@]}";
-do
- sudo snap install "$snaps";
-done
-
-# Install extensions for apps
-echo -e '\nRunning setup scripts for apps extensions'
-for ext in ./extensions/*-ext.sh;
-do
- bash ./extensions/"$ext";
-done
 
 echo -e '\nAll done!'
