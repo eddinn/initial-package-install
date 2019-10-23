@@ -38,6 +38,7 @@ Scripts that installs selective base user packages and extensions for initial se
 ```bash
 git clone https://github.com/eddinn/initial-package-install.git
 cd ./initial-package-install
+# Run the initial install, then post install for snap, pip and extensions
 bash ./initial-package-install.sh && bash ./post-initial.sh
 ```
 
@@ -48,7 +49,7 @@ bash ./initial-package-install.sh && bash ./post-initial.sh
 curl -L -O https://raw.githubusercontent.com/eddinn/initial-package-install/master/initial-package-install.sh || wget -L -O https://raw.githubusercontent.com/eddinn/initial-package-install/master/initial-package-install.sh
 bash ./initial-package-install.sh
 
-# Now we have git, so lets clone the repo and finish the setup
+# Now we have git, so lets clone the repo and finish the install
 rm -Rf ./initial-package-install.sh
 git clone https://github.com/eddinn/initial-package-install.git
 cd ./initial-package-install
