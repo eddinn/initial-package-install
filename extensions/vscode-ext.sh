@@ -49,10 +49,10 @@ vsext=(
 )
 
 # Install the extensions
-echo "Installing extensions for VS Code"
+echo -e "\nInstalling extensions for VS Code"
 for ext in "${vsext[@]}";
-  do code --install-extension "$ext";
+do
+ code --install-extension "$ext";
 done
 
-# Stowing the config
-#vscodeconf="$HOME"/.config/Code/User/settings.json
+echo -e "\nFinished installing VS Code extensions\n"
