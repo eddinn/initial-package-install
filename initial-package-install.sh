@@ -6,7 +6,6 @@
 
 # TODO:
 # Combine with setup.sh
-# Add gnome-shell-extensions
 # Break the script down to specific app installs with dotfiles and addons
 
 # Function for Ubuntu install
@@ -69,11 +68,11 @@ setup_ubuntu () {
   )
 
   # Install all the defines user packages via apt with suggested packages
-  echo -e "\nInstalling user packages"
+  echo -e '\nInstalling user packages'
   sudo apt install -y "${apt_packages[@]}"
 
   # Install latest stable Google Chrome, if not installed
-  echo -e "\nInstalling Google Chrome"
+  echo -e '\nInstalling Google Chrome'
   if [ "$(sudo dpkg-query -W -f='${Status}' google-chrome-stable 2>/dev/null | grep -c "ok installed")" -eq 0 ];
   then
     wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb || curl -L -O https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
@@ -82,7 +81,7 @@ setup_ubuntu () {
   fi
 
   # Install TeamViewer, if not installed
-  echo -e "\nInstalling TeamViewer"
+  echo -e '\nInstalling TeamViewer'
   if [ "$(sudo dpkg-query -W -f='${Status}' teamviewer 2>/dev/null | grep -c "ok installed")" -eq 0 ];
   then
     wget https://download.teamviewer.com/download/linux/teamviewer_amd64.deb || curl -L -O https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
@@ -145,20 +144,20 @@ setup_fedora () {
   )
 
   # Enable the Free and NonFree repos from RPM Fusion
-  echo -e "\nInstalling Free and NonFree RPM Fusion repo packages"
+  echo -e '\nInstalling Free and NonFree RPM Fusion repo packages'
   sudo dnf install -y https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-"$(rpm -E %fedora)".noarch.rpm
   sudo dnf install -y https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"$(rpm -E %fedora)".noarch.rpm
 
   # Enabling Appstream data from the RPM Fusion repos
-  echo -e "\nCore groupupdate"
+  echo -e '\nCore groupupdate'
   sudo dnf -y groupupdate core
 
   # Install all the defined user packages via dnf
-  echo -e "\nInstalling user packages"
+  echo -e '\nInstalling user packages'
   sudo dnf install -y "${rpm_packages[@]}"
 
   # Install latest stable Google Chrome, if not installed
-  echo -e "\nInstalling Google Chrome"
+  echo -e '\nInstalling Google Chrome'
   if [ "$(sudo rpm -q google-chrome-stable 2>/dev/null | grep -c "google-chrome-stable")" -eq 0 ];
   then
     wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm || curl -L -O https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm
@@ -167,7 +166,7 @@ setup_fedora () {
   fi
 
   # Install TeamViewer, if not installed
-  echo -e "\nInstalling TeamViewer"
+  echo -e '\nInstalling TeamViewer'
   if [ "$(sudo rpm -q teamviewer 2>/dev/null | grep -c "teamviewer")" -eq 0 ];
   then
     wget https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm || curl -L -O https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm
@@ -179,7 +178,7 @@ setup_fedora () {
 # Determine what OS distro we are running..
 # So far just Ubuntu and Fedora, since I use them the most.
 OS=$(awk -F'=' '/^NAME=/ {print tolower($2)}' /etc/*-release 2>/dev/null | tr -d '"')
-echo -e "Running on ${OS} distribution\n"
+echo -e "Running on" "${OS}" 'distribution\n'
 
 if [ "$OS" == "ubuntu" ]
 then
@@ -201,7 +200,7 @@ pip_packages=(
 )
 
 # Install Python3 pip packages
-echo -e "\nUpgrading pip3 and installing Python3 packages"
+echo -e '\nUpgrading pip3 and installing Python3 packages'
 # First, upgrade pip to latest version
 sudo -H pip3 install pip --upgrade
 # Install packages to user space
@@ -215,10 +214,10 @@ snap_packages=(
 )
 
 # Install user snap packages
-echo -e "\nInstalling VSCode and Slack with --classic"
+echo -e '\nInstalling VSCode and Slack with --classic'
 sudo snap install code --classic
 sudo snap install slack --classic
-echo -e "\nInstalling Snap packages"
+echo -e '\nInstalling Snap packages'
 # Install the rest of the snap packages
 for snaps in "${snap_packages[@]}";
 do
@@ -226,10 +225,10 @@ do
 done
 
 # Install extensions for apps
-echo -e "\nRunning setup scripts for apps extensions"
+echo -e '\nRunning setup scripts for apps extensions'
 for ext in ./extensions/*-ext.sh;
 do
  bash ./extensions/"$ext";
 done
 
-echo -e "\nAll done!"
+echo -e '\nAll done!'

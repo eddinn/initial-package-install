@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # define the extensions to install
-codeext=(
+vscext=(
   766b.go-outliner
   aaron-bond.better-comments
   balazs4.gitlab-pipeline-monitor
@@ -49,10 +49,10 @@ codeext=(
 )
 
 # Install the extensions
-echo -e "\nInstalling extensions for VS Code"
-for ext in "${codeext[@]}";
+echo -e '\nInstalling extensions for VSCode'
+for ext in "${vscext[@]}";
 do
  code --install-extension "$ext";
 done
 
-echo -e "\nFinished installing VS Code extensions\n"
+echo -e '\nFinished installing VSCode extensions\n'
