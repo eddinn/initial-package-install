@@ -13,6 +13,7 @@ Scripts that installs selective base user packages and extensions for initial se
   * ./ext/
   * ./ext/gnome-ext.sh
   * ./ext/vscode-ext.sh
+  * ./ext/zsh-ext.sh
 * Applications dir:
   * ./apps/
   * ./apps/pip.sh
@@ -28,6 +29,11 @@ Scripts that installs selective base user packages and extensions for initial se
   * .dots/git/.gitconfig
   * .dots/stowit.sh
   * .dots/zsh/.zshrc
+
+### What the scripts do
+
+1. The `initial-package-install.sh` script determines what Linux distributin it's running on and installs the predefined base packages and applications
+2. The `post-initial.sh` script installs all predefined snaps and Python3 pip packages, extensions for Gnome-Shell, VSCode and ZSH via supscripts from the `./apps` and `./ext/` dirs, along with running the `stowit.sh` script from the `./dots/` dir, which uses the `stow` command to link the dotfiles in place under `$HOME`
 
 ### Basic usage
 

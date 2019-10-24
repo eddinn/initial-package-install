@@ -23,6 +23,7 @@ setup_ubuntu () {
    chrome-gnome-shell
    dnsutils
    filezilla
+   fonts-powerline
    gamemode
    gettext
    git
@@ -44,6 +45,7 @@ setup_ubuntu () {
    openjdk-8-jre-headless
    openssh-server
    pkg-config
+   powerline
    puppet
    puppet-lint
    python3
@@ -63,6 +65,7 @@ setup_ubuntu () {
    vlc
    zip
    zsh
+   zsh-syntax-highlighting
   )
 
   # Install all the defines user packages via apt with suggested packages
@@ -123,6 +126,8 @@ setup_fedora () {
    npm
    openssh-server
    pkgconf-pkg-config
+   powerline
+   powerline-fonts
    puppet
    python3
    python3-pip
@@ -139,6 +144,7 @@ setup_fedora () {
    vlc
    zip
    zsh
+   zsh-syntax-highlighting
   )
 
   # Enable the Free and NonFree repos from RPM Fusion

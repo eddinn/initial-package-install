@@ -2,7 +2,7 @@
 
 # Install snap packages
 echo -e '\nInstalling snaps and python pip packages'
-for app in ./apps/*.sh;
+for app in ./apps/*-apps.sh;
 do
  bash ./apps/"$app";
 done
