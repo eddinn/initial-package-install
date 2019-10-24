@@ -31,13 +31,13 @@ echo -e '\nStowing apps for user: ' "$USERNAME"
 
 # install apps available to local users and root
 for APP in "${base[@]}"; do
-    stowit "$HOME" "$APP" 
+    stowit "$HOME" "$APP"
 done
 
 # install only user space folders
 for APP in "${useronly[@]}"; do
     if [[ ! "$USERNAME" = *"root"* ]]; then
-        stowit "$HOME" "$APP" 
+        stowit "$HOME" "$APP"
     fi
 done
 

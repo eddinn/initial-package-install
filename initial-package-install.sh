@@ -186,4 +186,5 @@ then
  setup_fedora
 fi
 
-echo -e '\nAll done!'
+echo -e '\n##########'
+echo -e '\nInitial install finished, now run the post-initial.sh to finish the setup\n'
