@@ -13,3 +13,11 @@ for exts in ./ext/*-ext.sh;
 do
  bash ./ext/"$exts";
 done
+
+# Stow all the dotfiles
+echo -e '\nStowing the dotfiles into' "$HOME"
+cd ./dots || echo "Can't change directory"; exit 1
+bash ./stowit.sh
+
+echo -e '\n##########'
+echo -e '\n All done, workspace setup complete!'
