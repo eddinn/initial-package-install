@@ -76,7 +76,8 @@ setup_ubuntu () {
   echo -e '\nInstalling Google Chrome'
   if [ "$(sudo dpkg-query -W -f='${Status}' google-chrome-stable 2>/dev/null | grep -c "ok installed")" -eq 0 ];
   then
-    wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb || curl -L -O https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+    # Try curl, else fall back to wget
+    curl -L -O https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb || wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
     sudo apt install -y ./google-chrome-stable_current_amd64.deb
     rm -Rf ./google-chrome-stable_current_amd64.deb
   fi
@@ -85,7 +86,8 @@ setup_ubuntu () {
   echo -e '\nInstalling TeamViewer'
   if [ "$(sudo dpkg-query -W -f='${Status}' teamviewer 2>/dev/null | grep -c "ok installed")" -eq 0 ];
   then
-    wget https://download.teamviewer.com/download/linux/teamviewer_amd64.deb || curl -L -O https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
+    # Try curl, else fall back to wget
+    curl -L -O https://download.teamviewer.com/download/linux/teamviewer_amd64.deb || wget https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
     sudo apt install -y ./teamviewer_amd64.deb
     rm -Rf ./teamviewer_amd64.deb
   fi
