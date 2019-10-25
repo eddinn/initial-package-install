@@ -1,30 +1,30 @@
 #!/usr/bin/env bash
 
 # Install gnome extensions
-echo -e '\nInstalling extensions for VS Code'
+printf -- '%s\n' "Installing extensions for VS Code"
 
-echo -e '\nInstalling Dash-to-Panel'
+printf -- '%s\n' "Installing Dash-to-Panel"
 git clone https://github.com/home-sweet-gnome/dash-to-panel.git
 (
-  cd ~/.local/share/gnome-shell/extensions/dash-to-panel || echo "Can't change directory"; exit 1
+  cd ./dash-to-panel || echo "Can't change directory"; exit 1
   make install
-  cd -
+  cd - || echo "Can't change directory"; exit 1
   rm -Rf dash-to-panel
 )
 
-echo -e '\nInstalling gTile'
+printf -- '%s\n' "Installing gTile"
 git clone https://github.com/gTile/gTile.git ~/.local/share/gnome-shell/extensions/gTile@vibou
 
-echo -e '\nInstalling Panel-OSD'
+printf -- '%s\n' "Installing Panel-OSD"
 git clone git://gitlab.com/jenslody/gnome-shell-extension-panel-osd.git ~/.local/share/gnome-shell/extensions/panel-osd
 (
   cd ~/.local/share/gnome-shell/extensions/panel-osd || echo "Can't change directory"; exit 1
   ./autogen.sh && make local-install
-  cd -
+  cd - || echo "Can't change directory"; exit 1
 )
 
-echo -e '\nInstalling Touchpad Indicator'
+printf -- '%s\n' "Installing Touchpad Indicator"
 git clone --depth=1 https://github.com/user501254/TouchpadIndicator.git
 mv TouchpadIndicator/ ~/.local/share/gnome-shell/extensions/touchpad-indicator@orangeshirt
 
-echo -e '\nFinished installing Gnome extensions\n'
+printf -- '%s\n' "Finished installing Gnome extensions" '%s\n'

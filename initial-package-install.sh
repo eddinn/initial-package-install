@@ -2,14 +2,25 @@
 
 # Author: Edvin Dunaway
 # Contact: edvin@eddinn.net
-# Version: 0.2
+# Version: 0.2.2
 
 # TODO:
+
+# Run as root with sudo
+if (( EUID != 0 )); then
+  printf -- '%s\n' "This script must be run with 'root' privileges, e.g 'sudo'" >&2
+  exit 1
+fi
+
+# Try curl, else fall back to wget in a function
+get_installer() {
+  curl -L -O "${1:?No source defined}" || wget "${1}"
+}
 
 # Function for Ubuntu install
 setup_ubuntu () {
   # Upgrade the system
-  sudo apt -y dist-upgrade
+  apt -y dist-upgrade
 
   # Define user Apt packages to install
   apt_packages=(
@@ -70,26 +81,24 @@ setup_ubuntu () {
   )
 
   # Install all the defines user packages via apt with suggested packages
-  echo -e '\nInstalling user packages'
-  sudo apt install -y "${apt_packages[@]}"
+  printf -- '%s\n' "Installing user packages"
+  apt install -y "${apt_packages[@]}"
 
   # Install latest stable Google Chrome, if not installed
-  echo -e '\nInstalling Google Chrome'
-  if [ "$(sudo dpkg-query -W -f='${Status}' google-chrome-stable 2>/dev/null | grep -c "ok installed")" -eq 0 ];
-  then
+  printf -- '%s\n' "Installing Google Chrome"
+  if ! dpkg-query -W -f='${Status}' google-chrome-stable 2>/dev/null | grep -c "ok installed"; then
     # Try curl, else fall back to wget
-    curl -L -O https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb || wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-    sudo apt install -y ./google-chrome-stable_current_amd64.deb
+    get_installer https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+    apt install -y ./google-chrome-stable_current_amd64.deb
     rm -Rf ./google-chrome-stable_current_amd64.deb
   fi
 
   # Install TeamViewer, if not installed
-  echo -e '\nInstalling TeamViewer'
-  if [ "$(sudo dpkg-query -W -f='${Status}' teamviewer 2>/dev/null | grep -c "ok installed")" -eq 0 ];
-  then
+  printf -- '%s\n' "Installing TeamViewer"
+  if ! dpkg-query -W -f='${Status}' teamviewer 2>/dev/null | grep -c "ok installed"; then
     # Try curl, else fall back to wget
-    curl -L -O https://download.teamviewer.com/download/linux/teamviewer_amd64.deb || wget https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
-    sudo apt install -y ./teamviewer_amd64.deb
+    get_installer https://download.teamviewer.com/download/linux/teamviewer_amd64.deb
+    apt install -y ./teamviewer_amd64.deb
     rm -Rf ./teamviewer_amd64.deb
   fi
 }
@@ -97,7 +106,7 @@ setup_ubuntu () {
 # Function for Fedora install
 setup_fedora () {
   # Upgrade the system
-  sudo dnf -y distro-sync
+  dnf -y distro-sync
 
   # Define user RPM packages to install
   rpm_packages=(
@@ -152,49 +161,45 @@ setup_fedora () {
   )
 
   # Enable the Free and NonFree repos from RPM Fusion
-  echo -e '\nInstalling Free and NonFree RPM Fusion repo packages'
-  sudo dnf install -y https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-"$(rpm -E %fedora)".noarch.rpm
-  sudo dnf install -y https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"$(rpm -E %fedora)".noarch.rpm
+  printf -- '%s\n' "Installing Free and NonFree RPM Fusion repo packages"
+  dnf install -y https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-"$(rpm -E %fedora)".noarch.rpm
+  dnf install -y https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"$(rpm -E %fedora)".noarch.rpm
 
   # Enabling Appstream data from the RPM Fusion repos
-  echo -e '\nCore groupupdate'
-  sudo dnf -y groupupdate core
+  printf -- '%s\n' "Core groupupdate"
+  dnf -y groupupdate core
 
   # Install all the defined user packages via dnf
-  echo -e '\nInstalling user packages'
-  sudo dnf install -y "${rpm_packages[@]}"
+  printf -- '%s\n' "Installing user packages"
+  dnf install -y "${rpm_packages[@]}"
 
   # Install latest stable Google Chrome, if not installed
-  echo -e '\nInstalling Google Chrome'
-  if [ "$(sudo rpm -q google-chrome-stable 2>/dev/null | grep -c "google-chrome-stable")" -eq 0 ];
-  then
-    wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm || curl -L -O https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm
-    sudo dnf install -y ./google-chrome-stable_current_x86_64.rpm
+  printf -- '%s\n' "Installing Google Chrome"
+  if ! rpm -q google-chrome-stable 2>/dev/null | grep -c "google-chrome-stable"; then
+    get_installer https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm
+    dnf install -y ./google-chrome-stable_current_x86_64.rpm
     rm -Rf ./google-chrome-stable_current_x86_64.rpm
   fi
 
   # Install TeamViewer, if not installed
-  echo -e '\nInstalling TeamViewer'
-  if [ "$(sudo rpm -q teamviewer 2>/dev/null | grep -c "teamviewer")" -eq 0 ];
-  then
-    wget https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm || curl -L -O https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm
-    sudo dnf install -y ./teamviewer.x86_64.rpm
+  printf -- '%s\n' "Installing TeamViewer"
+  if ! rpm -q teamviewer 2>/dev/null | grep -c "teamviewer"; then
+    get_installer https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm
+    dnf install -y ./teamviewer.x86_64.rpm
     rm -Rf ./teamviewer.x86_64.rpm
   fi
 }
 
 # Determine what OS distro we are running..
 # So far just Ubuntu and Fedora, since I use them the most.
-OS=$(awk -F'=' '/^NAME=/ {print tolower($2)}' /etc/*-release 2>/dev/null | tr -d '"')
-echo -e "Running on" "${OS}" 'distribution\n'
+host_distro=$(awk -F'=' '/^NAME=/ {print tolower($2)}' /etc/*-release 2>/dev/null | tr -d '"')
+printf -- '%s\n' "Running on ${host_distro} distribution"
 
-if [ "$OS" == "ubuntu" ]
-then
- setup_ubuntu
-elif [ "$OS" == "fedora" ]
-then
- setup_fedora
-fi
+case "${host_distro}" in
+  (ubuntu)  setup_ubuntu ;;
+  (fedora)  setup_fedora ;;
+  (*)  printf -- '%s\n' "Could not determine OS/Distro" >&2; exit 1 ;;
+esac
 
-echo -e '\n##########'
-echo -e '\nInitial install finished, now run the post-initial.sh to finish the setup\n'
+printf -- '%s\n' "##########"
+printf -- '%s\n' "Initial install finished, now run the post-initial.sh to finish the setup"

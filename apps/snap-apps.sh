@@ -8,10 +8,10 @@ snap_packages=(
 )
 
 # Install user snap packages
-echo -e '\nInstalling VSCode and Slack with --classic'
+printf -- '%s\n' "Installing VSCode and Slack with --classic"
 sudo snap install code --classic
 sudo snap install slack --classic
-echo -e '\nInstalling Snap packages'
+printf -- '%s\n' "Installing Snap packages"
 # Install the rest of the snap packages
 for snaps in "${snap_packages[@]}";
 do

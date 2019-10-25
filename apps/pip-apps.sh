@@ -12,8 +12,8 @@ pip_packages=(
 )
 
 # Install Python3 pip packages
-echo -e '\nUpgrading pip and installing Python3 packages'
+printf -- '%s\n' "Upgrading pip and installing Python3 packages"
 # First, upgrade pip to latest version
-sudo -H pip install pip --upgrade
+sudo -H pip3 install pip --upgrade
 # Install packages to user space
 pip3 install --user "${pip_packages[@]}"

@@ -49,10 +49,10 @@ vscext=(
 )
 
 # Install the extensions
-echo -e '\nInstalling extensions for VSCode'
+printf -- '%s\n' "Installing extensions for VSCode"
 for ext in "${vscext[@]}";
 do
  code --install-extension "$ext";
 done
 
-echo -e '\nFinished installing VSCode extensions\n'
+printf -- '%s\n' "Finished installing VSCode extensions" '%s\n'

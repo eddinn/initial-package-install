@@ -42,8 +42,8 @@ Scripts that installs selective base user packages and extensions for initial se
 ```bash
 git clone https://github.com/eddinn/initial-package-install.git
 cd ./initial-package-install
-# Run the initial install, then post install for snap, pip and extensions
-./initial-package-install.sh && ./post-initial.sh
+# Run the initial install as root with sudo, then post install for snap, pip and extensions
+sudo ./initial-package-install.sh; ./post-initial.sh
 ```
 
 #### If `git` is not already installed on the system
@@ -51,7 +51,7 @@ cd ./initial-package-install
 ```bash
 # Try curl, else fall back to wget
 curl -L -O https://raw.githubusercontent.com/eddinn/initial-package-install/master/initial-package-install.sh || wget -L -O https://raw.githubusercontent.com/eddinn/initial-package-install/master/initial-package-install.sh
-./initial-package-install.sh
+sudo ./initial-package-install.sh
 
 # Now we have git, so lets clone the repo and finish the install
 rm -Rf ./initial-package-install.sh
