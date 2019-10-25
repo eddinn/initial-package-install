@@ -21,6 +21,7 @@ setup_ubuntu () {
    bash-completion
    chkrootkit
    chrome-gnome-shell
+   curl
    dnsutils
    filezilla
    fonts-powerline
@@ -107,6 +108,7 @@ setup_fedora () {
    bind-utils
    chkrootkit
    chrome-gnome-shell
+   curl
    filezilla
    gamemode
    gettext-devel
