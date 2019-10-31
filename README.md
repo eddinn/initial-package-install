@@ -12,6 +12,7 @@ Scripts that installs selective base user packages and extensions for initial se
 * Extensions dir:
   * ./ext/
   * ./ext/gnome-ext.sh
+  * ./ext/themes-ext.sh
   * ./ext/vscode-ext.sh
   * ./ext/zsh-ext.sh
 * Applications dir:
