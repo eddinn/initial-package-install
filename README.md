@@ -1,5 +1,7 @@
 # Initial-package-install
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/592549f78ae34ef08b21bc91ef122d49)](https://www.codacy.com/manual/git_35/initial-package-install?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=eddinn/initial-package-install&amp;utm_campaign=Badge_Grade)
+
 Scripts that installs selective base user packages and extensions for initial setup of users workspase in Ubuntu/Fedora.
 
 ---
