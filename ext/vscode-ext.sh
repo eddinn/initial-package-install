@@ -46,6 +46,10 @@ vscext=(
   wholroyd.jinja
   windmilleng.vscode-go-autotest
   yzhang.markdown-all-in-one
+  michelemelluso.gitignore
+  vincaslt.highlight-matching-tag
+  byi8220.indented-block-highlighting
+  natqe.reload
 )
 
 # Install the extensions
