@@ -1,6 +1,6 @@
 # Initial-package-install
 
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/592549f78ae34ef08b21bc91ef122d49)](https://www.codacy.com/manual/Eddinn/initial-package-install?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=eddinn/initial-package-install&amp;utm_campaign=Badge_Grade) ![GitHub](https://img.shields.io/github/license/eddinn/initial-package-install)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/592549f78ae34ef08b21bc91ef122d49)](https://www.codacy.com/manual/Eddinn/initial-package-install?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=eddinn/initial-package-install&amp;utm_campaign=Badge_Grade) ![GitHub issues](https://img.shields.io/github/issues/eddinn/initial-package-install) ![GitHub](https://img.shields.io/github/license/eddinn/initial-package-install)
 
 Scripts that installs selective base user packages and extensions for initial setup of users workspase in Ubuntu/Fedora.
 
