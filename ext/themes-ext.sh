@@ -10,5 +10,4 @@ git clone https://github.com/vinceliuice/Qogir-theme.git
   # Also install globally for GDM for a good measure
   sudo ./install.sh -g
   cd - || echo "Can't change directory"; exit 1
-  rm -Rf Qogir-theme
 )

@@ -9,7 +9,6 @@ git clone https://github.com/home-sweet-gnome/dash-to-panel.git
   cd ./dash-to-panel || echo "Can't change directory"; exit 1
   make install
   cd - || echo "Can't change directory"; exit 1
-  rm -Rf dash-to-panel
 )
 
 printf -- '%s\n' "Installing gTile"
