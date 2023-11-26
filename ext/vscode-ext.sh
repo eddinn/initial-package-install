@@ -56,7 +56,7 @@ vscext=(
 printf -- '%s\n' "Installing extensions for VSCode"
 for ext in "${vscext[@]}";
 do
- code --install-extension "$ext";
+ code --install-extension "$ext" --force;
 done
 
 printf -- '%s\n' "Finished installing VSCode extensions" '%s\n'

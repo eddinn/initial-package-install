@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
 # Install gnome extensions
-printf -- '%s\n' "Installing extensions for VS Code"
-
 printf -- '%s\n' "Installing Dash-to-Panel"
 git clone https://github.com/home-sweet-gnome/dash-to-panel.git
 (
