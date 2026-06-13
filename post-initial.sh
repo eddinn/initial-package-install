@@ -3,12 +3,40 @@ set -euo pipefail
 
 failures=()
 
-user_shell() {
-  basename "${SHELL:-unknown}"
+detect_user_shell() {
+  local shell_name=""
+
+  if [[ -n ${DOTFILES_SHELL:-} ]]; then
+    basename "$DOTFILES_SHELL"
+    return 0
+  fi
+
+  shell_name=$(ps -p "${PPID}" -o comm= 2>/dev/null | awk '{print $1}' | sed 's/^-//') || true
+  case "$shell_name" in
+    bash|zsh) printf '%s\n' "$shell_name"; return 0 ;;
+  esac
+
+  shell_name=$(basename "${SHELL:-}")
+  case "$shell_name" in
+    bash|zsh) printf '%s\n' "$shell_name"; return 0 ;;
+  esac
+
+  if command -v getent >/dev/null 2>&1; then
+    shell_name=$(getent passwd "$(id -un)" | awk -F: '{print $7}' | xargs basename 2>/dev/null) || true
+    case "$shell_name" in
+      bash|zsh) printf '%s\n' "$shell_name"; return 0 ;;
+    esac
+  fi
+
+  printf '%s\n' "unknown"
 }
 
 export PATH="${HOME}/bin:${HOME}/.local/bin:${HOME}/.npm-global/bin:${PATH}"
-printf '%s\n' "Detected user shell: $(user_shell)"
+export FORCE_REINSTALL="${FORCE_REINSTALL:-1}"
+export DOTFILES_SHELL="${DOTFILES_SHELL:-$(detect_user_shell)}"
+
+printf '%s\n' "Detected user shell: ${DOTFILES_SHELL}"
+printf '%s\n' "Force reinstall/repair mode: ${FORCE_REINSTALL}"
 
 run_scripts() {
   local label=$1
