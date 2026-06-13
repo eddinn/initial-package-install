@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Author: Edvin Dunaway
 # Contact: edvin@eddinn.net
-# Version: 0.3.0
+# Version: 0.3.1
 
 if (( EUID != 0 )); then
   printf '%s\n' "This script must be run with root privileges, e.g. 'sudo ./initial-package-install.sh'" >&2
@@ -49,6 +49,62 @@ is_rpm_installed() {
   rpm -q "$1" >/dev/null 2>&1
 }
 
+apt_package_available() {
+  apt-cache show "$1" >/dev/null 2>&1
+}
+
+install_available_apt_packages() {
+  local packages=("$@")
+  local available=()
+  local skipped=()
+  local package
+
+  for package in "${packages[@]}"; do
+    if apt_package_available "$package"; then
+      available+=("$package")
+    else
+      skipped+=("$package")
+    fi
+  done
+
+  if ((${#available[@]} > 0)); then
+    DEBIAN_FRONTEND=noninteractive apt-get install -y "${available[@]}"
+  fi
+
+  if ((${#skipped[@]} > 0)); then
+    printf '\n%s\n' "Skipped unavailable Ubuntu packages:"
+    printf '  - %s\n' "${skipped[@]}"
+  fi
+}
+
+dnf_package_available() {
+  dnf -q repoquery "$1" >/dev/null 2>&1 || rpm -q "$1" >/dev/null 2>&1
+}
+
+install_available_dnf_packages() {
+  local packages=("$@")
+  local available=()
+  local skipped=()
+  local package
+
+  for package in "${packages[@]}"; do
+    if dnf_package_available "$package"; then
+      available+=("$package")
+    else
+      skipped+=("$package")
+    fi
+  done
+
+  if ((${#available[@]} > 0)); then
+    dnf install -y "${available[@]}"
+  fi
+
+  if ((${#skipped[@]} > 0)); then
+    printf '\n%s\n' "Skipped unavailable Fedora packages:"
+    printf '  - %s\n' "${skipped[@]}"
+  fi
+}
+
 setup_ubuntu() {
   local apt_packages=(
     audacity
@@ -70,7 +126,6 @@ setup_ubuntu() {
     gnome-browser-connector
     gnome-tweaks
     golang-go
-    grub-customizer
     hexchat
     jq
     lame
@@ -95,7 +150,7 @@ setup_ubuntu() {
     rsync
     shellcheck
     snapd
-    steam
+    steam-installer
     stow
     unattended-upgrades
     unzip
@@ -106,6 +161,10 @@ setup_ubuntu() {
     zsh-syntax-highlighting
   )
 
+  local optional_apt_packages=(
+    grub-customizer
+  )
+
   log "Updating Ubuntu package metadata"
   apt-get update
 
@@ -113,7 +172,10 @@ setup_ubuntu() {
   DEBIAN_FRONTEND=noninteractive apt-get -y full-upgrade
 
   log "Installing Ubuntu packages"
-  DEBIAN_FRONTEND=noninteractive apt-get install -y "${apt_packages[@]}"
+  install_available_apt_packages "${apt_packages[@]}"
+
+  log "Installing optional Ubuntu packages when available"
+  install_available_apt_packages "${optional_apt_packages[@]}"
 
   log "Installing Google Chrome"
   if ! is_deb_installed google-chrome-stable; then
@@ -201,7 +263,7 @@ setup_fedora() {
   dnf -y groupupdate core
 
   log "Installing Fedora packages"
-  dnf install -y "${rpm_packages[@]}"
+  install_available_dnf_packages "${rpm_packages[@]}"
 
   log "Installing Google Chrome"
   if ! is_rpm_installed google-chrome-stable; then
