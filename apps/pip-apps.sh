@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export PATH="${HOME}/.local/bin:${PATH}"
+
 if ! command -v pipx >/dev/null 2>&1; then
   printf '%s\n' "pipx is required. Re-run ./initial-package-install.sh first, or install pipx manually." >&2
   exit 1
@@ -17,13 +19,12 @@ install_or_upgrade() {
   fi
 }
 
-printf '%s\n' "Ensuring pipx user path"
-python3 -m pipx ensurepath
+printf '%s\n' "Using PATH with ${HOME}/.local/bin for pipx apps"
 
 printf '%s\n' "Installing/upgrading Python CLI tools"
-install_or_upgrade ansible --include-deps
-install_or_upgrade ansible-lint --include-deps
-install_or_upgrade awxkit --include-deps
+install_or_upgrade ansible
+install_or_upgrade ansible-lint
+install_or_upgrade awxkit
 
 printf '%s\n' "Adding WinRM support to the Ansible pipx environment"
 pipx inject --force ansible pywinrm
