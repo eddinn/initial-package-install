@@ -3,11 +3,11 @@ set -euo pipefail
 
 classic_snaps=(
   gitkraken
-  slack
 )
 
 strict_snaps=(
   discord
+  slack
   spotify
   steam
 )
