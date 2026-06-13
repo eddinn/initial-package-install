@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Author: Edvin Dunaway
 # Contact: edvin@eddinn.net
-# Version: 0.3.2
+# Version: 0.3.3
 
 if (( EUID != 0 )); then
   printf '%s\n' "This script must be run with root privileges, e.g. 'sudo ./initial-package-install.sh'" >&2
@@ -57,6 +57,30 @@ is_deb_installed() {
 
 is_rpm_installed() {
   rpm -q "$1" >/dev/null 2>&1
+}
+
+disable_teamviewer_apt_sources() {
+  local file
+
+  shopt -s nullglob
+  local files=(/etc/apt/sources.list.d/teamviewer*.list /etc/apt/sources.list.d/teamviewer*.sources)
+  shopt -u nullglob
+
+  for file in "${files[@]}"; do
+    [[ -e "$file" ]] || continue
+    mv -f "$file" "${file}.disabled-by-initial-package-install"
+    printf '%s\n' "Disabled TeamViewer APT source: $file"
+  done
+}
+
+apt_update() {
+  if apt-get update; then
+    return 0
+  fi
+
+  printf '%s\n' "APT update failed. Disabling TeamViewer APT sources and retrying once." >&2
+  disable_teamviewer_apt_sources
+  apt-get update
 }
 
 apt_package_available() {
@@ -125,36 +149,54 @@ setup_ubuntu_apt_repos() {
 
   log "Adding official Google Chrome APT repository"
   install_keyring_from_url https://dl.google.com/linux/linux_signing_key.pub /etc/apt/keyrings/google-linux.gpg
-  cat >/etc/apt/sources.list.d/google-chrome.sources <<'EOF'
+  cat >/etc/apt/sources.list.d/google-chrome.sources <<'EOF_SOURCES'
 Types: deb
 URIs: https://dl.google.com/linux/chrome/deb/
 Suites: stable
 Components: main
 Architectures: amd64
 Signed-By: /etc/apt/keyrings/google-linux.gpg
-EOF
+EOF_SOURCES
 
   log "Adding official Visual Studio Code APT repository"
   install_keyring_from_url https://packages.microsoft.com/keys/microsoft.asc /etc/apt/keyrings/microsoft.gpg
-  cat >/etc/apt/sources.list.d/vscode.sources <<'EOF'
+  cat >/etc/apt/sources.list.d/vscode.sources <<'EOF_SOURCES'
 Types: deb
 URIs: https://packages.microsoft.com/repos/code
 Suites: stable
 Components: main
 Architectures: amd64 arm64 armhf
 Signed-By: /etc/apt/keyrings/microsoft.gpg
-EOF
+EOF_SOURCES
+}
 
-  log "Adding official TeamViewer APT repository"
-  install_keyring_from_url https://download.teamviewer.com/download/linux/signature/TeamViewer2017.asc /etc/apt/keyrings/teamviewer.gpg
-  cat >/etc/apt/sources.list.d/teamviewer.sources <<'EOF'
-Types: deb
-URIs: https://linux.teamviewer.com/deb
-Suites: stable
-Components: main
-Architectures: amd64
-Signed-By: /etc/apt/keyrings/teamviewer.gpg
-EOF
+install_teamviewer_ubuntu() {
+  local deb_file=teamviewer_amd64.deb
+
+  log "Installing TeamViewer"
+
+  if is_deb_installed teamviewer; then
+    printf '%s\n' "teamviewer is already installed"
+    return 0
+  fi
+
+  if apt_package_available teamviewer && DEBIAN_FRONTEND=noninteractive apt-get install -y teamviewer; then
+    return 0
+  fi
+
+  DEBIAN_FRONTEND=noninteractive apt-get -f install -y || true
+
+  printf '%s\n' "TeamViewer APT package was not installable; trying the official TeamViewer .deb"
+  download_file https://download.teamviewer.com/download/linux/teamviewer_amd64.deb "$deb_file"
+
+  if DEBIAN_FRONTEND=noninteractive apt-get install -y "./${deb_file}"; then
+    rm -f "$deb_file"
+    return 0
+  fi
+
+  rm -f "$deb_file"
+  DEBIAN_FRONTEND=noninteractive apt-get -f install -y || true
+  printf '%s\n' "Skipped TeamViewer because both APT and the official .deb install failed." >&2
 }
 
 setup_ubuntu() {
@@ -205,7 +247,6 @@ setup_ubuntu() {
     shellcheck
     snapd
     stow
-    teamviewer
     unattended-upgrades
     unzip
     vim
@@ -220,7 +261,7 @@ setup_ubuntu() {
   )
 
   log "Updating Ubuntu package metadata"
-  apt-get update
+  apt_update
 
   log "Upgrading installed Ubuntu packages"
   DEBIAN_FRONTEND=noninteractive apt-get -y full-upgrade
@@ -228,13 +269,15 @@ setup_ubuntu() {
   setup_ubuntu_apt_repos
 
   log "Updating Ubuntu package metadata after adding third-party repositories"
-  apt-get update
+  apt_update
 
   log "Installing Ubuntu packages"
   install_available_apt_packages "${apt_packages[@]}"
 
   log "Installing optional Ubuntu packages when available"
   install_available_apt_packages "${optional_apt_packages[@]}"
+
+  install_teamviewer_ubuntu
 }
 
 setup_fedora() {
