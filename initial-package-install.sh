@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Author: Edvin Dunaway
 # Contact: edvin@eddinn.net
-# Version: 0.3.1
+# Version: 0.3.2
 
 if (( EUID != 0 )); then
   printf '%s\n' "This script must be run with root privileges, e.g. 'sudo ./initial-package-install.sh'" >&2
@@ -41,6 +41,16 @@ download_file() {
   fi
 }
 
+install_keyring_from_url() {
+  local url=${1:?No key URL defined}
+  local keyring=${2:?No keyring path defined}
+
+  download_file "$url" "${keyring}.tmp"
+  gpg --dearmor --yes -o "$keyring" "${keyring}.tmp"
+  rm -f "${keyring}.tmp"
+  chmod 0644 "$keyring"
+}
+
 is_deb_installed() {
   dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q 'ok installed'
 }
@@ -55,24 +65,25 @@ apt_package_available() {
 
 install_available_apt_packages() {
   local packages=("$@")
-  local available=()
   local skipped=()
   local package
 
   for package in "${packages[@]}"; do
-    if apt_package_available "$package"; then
-      available+=("$package")
-    else
-      skipped+=("$package")
+    if ! apt_package_available "$package"; then
+      skipped+=("${package} (not found)")
+      continue
     fi
+
+    if DEBIAN_FRONTEND=noninteractive apt-get install -y "$package"; then
+      continue
+    fi
+
+    skipped+=("${package} (dependency/install failure)")
+    DEBIAN_FRONTEND=noninteractive apt-get -f install -y || true
   done
 
-  if ((${#available[@]} > 0)); then
-    DEBIAN_FRONTEND=noninteractive apt-get install -y "${available[@]}"
-  fi
-
   if ((${#skipped[@]} > 0)); then
-    printf '\n%s\n' "Skipped unavailable Ubuntu packages:"
+    printf '\n%s\n' "Skipped Ubuntu packages:"
     printf '  - %s\n' "${skipped[@]}"
   fi
 }
@@ -83,26 +94,67 @@ dnf_package_available() {
 
 install_available_dnf_packages() {
   local packages=("$@")
-  local available=()
   local skipped=()
   local package
 
   for package in "${packages[@]}"; do
-    if dnf_package_available "$package"; then
-      available+=("$package")
-    else
-      skipped+=("$package")
+    if ! dnf_package_available "$package"; then
+      skipped+=("${package} (not found)")
+      continue
     fi
+
+    if dnf install -y "$package"; then
+      continue
+    fi
+
+    skipped+=("${package} (dependency/install failure)")
+    dnf -y distro-sync || true
   done
 
-  if ((${#available[@]} > 0)); then
-    dnf install -y "${available[@]}"
-  fi
-
   if ((${#skipped[@]} > 0)); then
-    printf '\n%s\n' "Skipped unavailable Fedora packages:"
+    printf '\n%s\n' "Skipped Fedora packages:"
     printf '  - %s\n' "${skipped[@]}"
   fi
+}
+
+setup_ubuntu_apt_repos() {
+  log "Installing APT repository helper packages"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl gnupg wget
+
+  install -d -m 0755 /etc/apt/keyrings
+
+  log "Adding official Google Chrome APT repository"
+  install_keyring_from_url https://dl.google.com/linux/linux_signing_key.pub /etc/apt/keyrings/google-linux.gpg
+  cat >/etc/apt/sources.list.d/google-chrome.sources <<'EOF'
+Types: deb
+URIs: https://dl.google.com/linux/chrome/deb/
+Suites: stable
+Components: main
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/google-linux.gpg
+EOF
+
+  log "Adding official Visual Studio Code APT repository"
+  install_keyring_from_url https://packages.microsoft.com/keys/microsoft.asc /etc/apt/keyrings/microsoft.gpg
+  cat >/etc/apt/sources.list.d/vscode.sources <<'EOF'
+Types: deb
+URIs: https://packages.microsoft.com/repos/code
+Suites: stable
+Components: main
+Architectures: amd64 arm64 armhf
+Signed-By: /etc/apt/keyrings/microsoft.gpg
+EOF
+
+  log "Adding official TeamViewer APT repository"
+  install_keyring_from_url https://download.teamviewer.com/download/linux/signature/TeamViewer2017.asc /etc/apt/keyrings/teamviewer.gpg
+  cat >/etc/apt/sources.list.d/teamviewer.sources <<'EOF'
+Types: deb
+URIs: https://linux.teamviewer.com/deb
+Suites: stable
+Components: main
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/teamviewer.gpg
+EOF
 }
 
 setup_ubuntu() {
@@ -114,6 +166,7 @@ setup_ubuntu() {
     autotools-dev
     bash-completion
     chkrootkit
+    code
     curl
     default-jre
     default-mysql-client
@@ -126,6 +179,7 @@ setup_ubuntu() {
     gnome-browser-connector
     gnome-tweaks
     golang-go
+    google-chrome-stable
     hexchat
     jq
     lame
@@ -150,8 +204,8 @@ setup_ubuntu() {
     rsync
     shellcheck
     snapd
-    steam-installer
     stow
+    teamviewer
     unattended-upgrades
     unzip
     vim
@@ -171,29 +225,16 @@ setup_ubuntu() {
   log "Upgrading installed Ubuntu packages"
   DEBIAN_FRONTEND=noninteractive apt-get -y full-upgrade
 
+  setup_ubuntu_apt_repos
+
+  log "Updating Ubuntu package metadata after adding third-party repositories"
+  apt-get update
+
   log "Installing Ubuntu packages"
   install_available_apt_packages "${apt_packages[@]}"
 
   log "Installing optional Ubuntu packages when available"
   install_available_apt_packages "${optional_apt_packages[@]}"
-
-  log "Installing Google Chrome"
-  if ! is_deb_installed google-chrome-stable; then
-    download_file https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb google-chrome-stable_current_amd64.deb
-    DEBIAN_FRONTEND=noninteractive apt-get install -y ./google-chrome-stable_current_amd64.deb
-    rm -f google-chrome-stable_current_amd64.deb
-  else
-    printf '%s\n' "google-chrome-stable is already installed"
-  fi
-
-  log "Installing TeamViewer"
-  if ! is_deb_installed teamviewer; then
-    download_file https://download.teamviewer.com/download/linux/teamviewer_amd64.deb teamviewer_amd64.deb
-    DEBIAN_FRONTEND=noninteractive apt-get install -y ./teamviewer_amd64.deb
-    rm -f teamviewer_amd64.deb
-  else
-    printf '%s\n' "teamviewer is already installed"
-  fi
 }
 
 setup_fedora() {
@@ -264,24 +305,6 @@ setup_fedora() {
 
   log "Installing Fedora packages"
   install_available_dnf_packages "${rpm_packages[@]}"
-
-  log "Installing Google Chrome"
-  if ! is_rpm_installed google-chrome-stable; then
-    download_file https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm google-chrome-stable_current_x86_64.rpm
-    dnf install -y ./google-chrome-stable_current_x86_64.rpm
-    rm -f google-chrome-stable_current_x86_64.rpm
-  else
-    printf '%s\n' "google-chrome-stable is already installed"
-  fi
-
-  log "Installing TeamViewer"
-  if ! is_rpm_installed teamviewer; then
-    download_file https://download.teamviewer.com/download/linux/teamviewer.x86_64.rpm teamviewer.x86_64.rpm
-    dnf install -y ./teamviewer.x86_64.rpm
-    rm -f teamviewer.x86_64.rpm
-  else
-    printf '%s\n' "teamviewer is already installed"
-  fi
 }
 
 log "Detected distribution: ${host_distro}"
