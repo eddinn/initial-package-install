@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+FORCE_REINSTALL="${FORCE_REINSTALL:-0}"
+
 classic_snaps=(
   gitkraken
 )
@@ -17,7 +19,15 @@ install_or_refresh_snap() {
   shift || true
 
   if snap list "$snap_name" >/dev/null 2>&1; then
-    sudo snap refresh "$snap_name"
+    if sudo snap refresh "$snap_name"; then
+      return 0
+    fi
+
+    if [[ "$FORCE_REINSTALL" == "1" ]]; then
+      printf '%s\n' "Snap refresh failed; reinstalling ${snap_name}"
+      sudo snap remove "$snap_name" || true
+      sudo snap install "$snap_name" "$@"
+    fi
   else
     sudo snap install "$snap_name" "$@"
   fi
