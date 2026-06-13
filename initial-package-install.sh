@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Author: Edvin Dunaway
 # Contact: edvin@eddinn.net
-# Version: 0.3.3
+# Version: 0.3.4
 
 if (( EUID != 0 )); then
   printf '%s\n' "This script must be run with root privileges, e.g. 'sudo ./initial-package-install.sh'" >&2
@@ -51,10 +51,6 @@ install_keyring_from_url() {
   chmod 0644 "$keyring"
 }
 
-is_deb_installed() {
-  dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q 'ok installed'
-}
-
 is_rpm_installed() {
   rpm -q "$1" >/dev/null 2>&1
 }
@@ -69,7 +65,7 @@ disable_teamviewer_apt_sources() {
   for file in "${files[@]}"; do
     [[ -e "$file" ]] || continue
     mv -f "$file" "${file}.disabled-by-initial-package-install"
-    printf '%s\n' "Disabled TeamViewer APT source: $file"
+    printf '%s\n' "Disabled stale TeamViewer APT source: $file"
   done
 }
 
@@ -78,7 +74,7 @@ apt_update() {
     return 0
   fi
 
-  printf '%s\n' "APT update failed. Disabling TeamViewer APT sources and retrying once." >&2
+  printf '%s\n' "APT update failed. Disabling stale TeamViewer APT sources and retrying once." >&2
   disable_teamviewer_apt_sources
   apt-get update
 }
@@ -170,35 +166,6 @@ Signed-By: /etc/apt/keyrings/microsoft.gpg
 EOF_SOURCES
 }
 
-install_teamviewer_ubuntu() {
-  local deb_file=teamviewer_amd64.deb
-
-  log "Installing TeamViewer"
-
-  if is_deb_installed teamviewer; then
-    printf '%s\n' "teamviewer is already installed"
-    return 0
-  fi
-
-  if apt_package_available teamviewer && DEBIAN_FRONTEND=noninteractive apt-get install -y teamviewer; then
-    return 0
-  fi
-
-  DEBIAN_FRONTEND=noninteractive apt-get -f install -y || true
-
-  printf '%s\n' "TeamViewer APT package was not installable; trying the official TeamViewer .deb"
-  download_file https://download.teamviewer.com/download/linux/teamviewer_amd64.deb "$deb_file"
-
-  if DEBIAN_FRONTEND=noninteractive apt-get install -y "./${deb_file}"; then
-    rm -f "$deb_file"
-    return 0
-  fi
-
-  rm -f "$deb_file"
-  DEBIAN_FRONTEND=noninteractive apt-get -f install -y || true
-  printf '%s\n' "Skipped TeamViewer because both APT and the official .deb install failed." >&2
-}
-
 setup_ubuntu() {
   local apt_packages=(
     audacity
@@ -256,10 +223,6 @@ setup_ubuntu() {
     zsh-syntax-highlighting
   )
 
-  local optional_apt_packages=(
-    grub-customizer
-  )
-
   log "Updating Ubuntu package metadata"
   apt_update
 
@@ -273,11 +236,6 @@ setup_ubuntu() {
 
   log "Installing Ubuntu packages"
   install_available_apt_packages "${apt_packages[@]}"
-
-  log "Installing optional Ubuntu packages when available"
-  install_available_apt_packages "${optional_apt_packages[@]}"
-
-  install_teamviewer_ubuntu
 }
 
 setup_fedora() {
@@ -299,7 +257,6 @@ setup_fedora() {
     gnome-browser-connector
     gnome-tweaks
     golang
-    grub-customizer
     hexchat
     java-latest-openjdk
     jq
