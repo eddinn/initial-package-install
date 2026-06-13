@@ -1,22 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+FORCE_REINSTALL="${FORCE_REINSTALL:-0}"
+omz_dir="${HOME}/.oh-my-zsh"
+
 if ! command -v zsh >/dev/null 2>&1; then
   printf '%s\n' "zsh is not installed. Re-run ./initial-package-install.sh first." >&2
   exit 1
 fi
+
+clone_oh_my_zsh() {
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  trap 'rm -rf "$tmpdir"' RETURN
+
+  git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git "${tmpdir}/oh-my-zsh"
+  rm -rf "$omz_dir"
+  mv "${tmpdir}/oh-my-zsh" "$omz_dir"
+}
 
 printf '%s\n' "Installing/updating Oh My Zsh"
 export RUNZSH=no
 export CHSH=no
 export KEEP_ZSHRC=yes
 
-if [[ -d "${HOME}/.oh-my-zsh" ]]; then
-  ZSH="${HOME}/.oh-my-zsh" zsh -ic 'omz update' || true
+if [[ "$FORCE_REINSTALL" == "1" ]]; then
+  printf '%s\n' "Force reinstalling Oh My Zsh"
+  clone_oh_my_zsh || printf '%s\n' "Could not reinstall Oh My Zsh right now; keeping existing install if present." >&2
+elif [[ -d "$omz_dir" ]]; then
+  git -C "$omz_dir" pull --ff-only || printf '%s\n' "Could not update Oh My Zsh right now; continuing." >&2
 else
-  sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+  clone_oh_my_zsh
 fi
 
 if [[ "${SHELL:-}" != "$(command -v zsh)" ]]; then
-  chsh -s "$(command -v zsh)" || printf '%s\n' "Could not change default shell automatically. Run: chsh -s $(command -v zsh)"
+  printf '%s\n' "Default shell is not zsh. Change it manually with: chsh -s $(command -v zsh)"
 fi
