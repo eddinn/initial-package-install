@@ -1,25 +1,34 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-# Install snap packages
-printf -- '%s\n' "Installing snaps and python pip packages"
-for app in ./apps/*-apps.sh;
-do
- bash "$app";
-done
+run_scripts() {
+  local label=$1
+  local pattern=$2
+  local script
 
-# Install extensions for apps
-printf -- '%s\n' "Installing apps extensions"
-for exts in ./ext/*-ext.sh;
-do
- bash "$exts";
-done
+  shopt -s nullglob
+  local scripts=( $pattern )
+  shopt -u nullglob
 
-# Stow all the dotfiles
-printf -- '%s\n' "Stowing the dotfiles into $HOME"
+  if ((${#scripts[@]} == 0)); then
+    printf '%s\n' "No ${label} scripts found for pattern: ${pattern}"
+    return 0
+  fi
+
+  printf '\n%s\n' "==> Running ${label} scripts"
+  for script in "${scripts[@]}"; do
+    printf '%s\n' "Running ${script}"
+    bash "$script"
+  done
+}
+
+run_scripts "application" "./apps/*-apps.sh"
+run_scripts "extension" "./ext/*-ext.sh"
+
+printf '\n%s\n' "==> Stowing dotfiles into ${HOME}"
 (
-  cd ./dots || echo "Can't change directory"; exit 1
+  cd ./dots || { printf '%s\n' "Can't change directory to ./dots" >&2; exit 1; }
   bash ./stowit.sh
 )
 
-printf -- '%s\n' "##########"
-printf -- '%s\n' "All done, workspace setup complete!"
+printf '\n%s\n' "All done, workspace setup complete!"

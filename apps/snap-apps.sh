@@ -1,19 +1,34 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-# Define Snap packages to install
-snap_packages=(
- discord
- gitkraken
- spotify
+classic_snaps=(
+  code
+  gitkraken
+  slack
 )
 
-# Install user snap packages
-printf -- '%s\n' "Installing VSCode and Slack with --classic"
-sudo snap install code --classic
-sudo snap install slack --classic
-printf -- '%s\n' "Installing Snap packages"
-# Install the rest of the snap packages
-for snaps in "${snap_packages[@]}";
-do
- sudo snap install "$snaps";
+strict_snaps=(
+  discord
+  spotify
+)
+
+install_or_refresh_snap() {
+  local snap_name=${1:?No snap name supplied}
+  shift || true
+
+  if snap list "$snap_name" >/dev/null 2>&1; then
+    sudo snap refresh "$snap_name"
+  else
+    sudo snap install "$snap_name" "$@"
+  fi
+}
+
+printf '%s\n' "Installing/updating classic snaps"
+for snap_name in "${classic_snaps[@]}"; do
+  install_or_refresh_snap "$snap_name" --classic
+done
+
+printf '%s\n' "Installing/updating strict snaps"
+for snap_name in "${strict_snaps[@]}"; do
+  install_or_refresh_snap "$snap_name"
 done

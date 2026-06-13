@@ -1,62 +1,51 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-# define the extensions to install
-vscext=(
+if ! command -v code >/dev/null 2>&1; then
+  printf '%s\n' "VS Code CLI ('code') was not found. Install VS Code first, then re-run this script." >&2
+  exit 1
+fi
+
+vscode_extensions=(
   766b.go-outliner
   aaron-bond.better-comments
-  balazs4.gitlab-pipeline-monitor
-  CoenraadS.bracket-pair-colorizer
   DavidAnson.vscode-markdownlint
   dbaeumer.vscode-eslint
   donjayamanne.githistory
-  donjayamanne.python-extension-pack
   eamodio.gitlens
   ecmel.vscode-html-css
   esbenp.prettier-vscode
-  fatihacet.gitlab-workflow
   formulahendry.code-runner
-  formulahendry.terminal
-  HookyQR.beautify
+  GitLab.gitlab-workflow
+  golang.Go
   ionutvmi.path-autocomplete
-  jpogran.puppet-vscode
-  KevinRose.vsc-python-indent
-  logerfo.gitlab-notifications
   magicstack.MagicPython
+  michelemelluso.gitignore
   mikestead.dotenv
   ms-python.python
-  ms-vscode.Go
-  ms-vscode.powershell
-  msjsdiag.debugger-for-chrome
-  msyrus.go-doc
-  neverik.go-critic
+  ms-python.vscode-pylance
+  ms-vscode.PowerShell
   PKief.material-icon-theme
   pranaygp.vscode-css-peek
-  premparihar.gotestexplorer
-  rebornix.ruby
+  puppet.puppet-vscode
+  rebornix.Ruby
   redhat.vscode-yaml
   rogalmic.bash-debug
   samverschueren.final-newline
   shd101wyy.markdown-preview-enhanced
-  shinnn.stylelint
   SirTori.indenticator
-  steoates.autoimport
+  stylelint.vscode-stylelint
   timonwong.shellcheck
+  vincaslt.highlight-matching-tag
   VisualStudioExptTeam.vscodeintellicode
   vscode-icons-team.vscode-icons
   wholroyd.jinja
-  windmilleng.vscode-go-autotest
   yzhang.markdown-all-in-one
-  michelemelluso.gitignore
-  vincaslt.highlight-matching-tag
-  byi8220.indented-block-highlighting
-  natqe.reload
 )
 
-# Install the extensions
-printf -- '%s\n' "Installing extensions for VSCode"
-for ext in "${vscext[@]}";
-do
- code --install-extension "$ext" --force;
+printf '%s\n' "Installing/updating VS Code extensions"
+for extension in "${vscode_extensions[@]}"; do
+  code --install-extension "$extension" --force
 done
 
-printf -- '%s\n' "Finished installing VSCode extensions" '%s\n'
+printf '%s\n' "Finished installing VS Code extensions"

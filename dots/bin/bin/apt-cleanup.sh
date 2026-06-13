@@ -1,6 +1,8 @@
-#!/bin/bash
-echo "Cleaning Up" &&
-sudo apt -f install &&
-sudo apt --purge autoremove &&
-sudo apt -y autoclean &&
-sudo apt -y clean
+#!/usr/bin/env bash
+set -euo pipefail
+
+printf '%s\n' "Cleaning up APT packages"
+sudo apt-get -f install
+sudo apt-get --purge autoremove -y
+sudo apt-get autoclean -y
+sudo apt-get clean

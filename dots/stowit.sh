@@ -1,46 +1,33 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-# make sure we have pulled in and updated any submodules
-git submodule init
-git submodule update
-
-USERNAME=$(whoami)
-
-# what directories should be installable by all users including the root user
 base=(
-    bash
-    zsh
+  bash
+  zsh
 )
 
-# folders that should, or only need to be installed for a local user
-useronly=(
-    git
-    bin
-    
+user_only=(
+  git
+  bin
 )
 
-# run the stow command for the passed in directory ($2) in location $1
-stowit() {
-    USR=$1
-    APP=$2
-    # -v verbose
-    # -R recursive
-    # -t target
-    stow -v -R -t "$USR" "$APP"
+stow_package() {
+  local target=${1:?No target directory supplied}
+  local package=${2:?No stow package supplied}
+
+  stow -v -R -t "$target" "$package"
 }
 
-echo -e '\nStowing apps for user: ' "$USERNAME"
+printf '\n%s\n' "Stowing dotfiles for user: $(whoami)"
 
-# install apps available to local users and root
-for APP in "${base[@]}"; do
-    stowit "$HOME" "$APP"
+for package in "${base[@]}"; do
+  stow_package "$HOME" "$package"
 done
 
-# install only user space folders
-for APP in "${useronly[@]}"; do
-    if [[ ! "$USERNAME" = *"root"* ]]; then
-        stowit "$HOME" "$APP"
-    fi
-done
+if [[ ${EUID} -ne 0 ]]; then
+  for package in "${user_only[@]}"; do
+    stow_package "$HOME" "$package"
+  done
+fi
 
-echo -e '\nAll done!'
+printf '\n%s\n' "All done!"

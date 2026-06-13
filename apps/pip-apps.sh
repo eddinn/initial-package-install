@@ -1,19 +1,29 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-# Define Python3 Pip packages to install
-pip_packages=(
- setuptools
- wheel
- ansible
- ansible-lint
- ansible-tower-cli
- pywinrm
- testresources
-)
+if ! command -v pipx >/dev/null 2>&1; then
+  printf '%s\n' "pipx is required. Re-run ./initial-package-install.sh first, or install pipx manually." >&2
+  exit 1
+fi
 
-# Install Python3 pip packages
-printf -- '%s\n' "Upgrading pip and installing Python3 packages"
-# First, upgrade pip to latest version
-sudo -H pip3 install pip --upgrade
-# Install packages to user space
-pip3 install --user "${pip_packages[@]}"
+install_or_upgrade() {
+  local app=${1:?No pipx app name supplied}
+  shift || true
+
+  if pipx list --short 2>/dev/null | awk '{print $1}' | grep -Fxq "$app"; then
+    pipx upgrade "$app"
+  else
+    pipx install "$app" "$@"
+  fi
+}
+
+printf '%s\n' "Ensuring pipx user path"
+python3 -m pipx ensurepath
+
+printf '%s\n' "Installing/upgrading Python CLI tools"
+install_or_upgrade ansible --include-deps
+install_or_upgrade ansible-lint --include-deps
+install_or_upgrade awxkit --include-deps
+
+printf '%s\n' "Adding WinRM support to the Ansible pipx environment"
+pipx inject --force ansible pywinrm

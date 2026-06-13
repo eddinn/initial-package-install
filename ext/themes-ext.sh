@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-#Install the Qogir theme
-printf -- '%s\n' "Installing the Qogir theme"
-git clone https://github.com/vinceliuice/Qogir-theme.git
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+printf '%s\n' "Installing/updating the Qogir theme"
+git clone --depth=1 https://github.com/vinceliuice/Qogir-theme.git "${tmpdir}/Qogir-theme"
 (
-  cd Qogir-theme || echo "Can't change directory"; exit 1
-  # Install to ~/.themes
+  cd "${tmpdir}/Qogir-theme" || { printf '%s\n' "Can't change directory to Qogir theme source" >&2; exit 1; }
   ./install.sh
-  # Also install globally for GDM for a good measure
   sudo ./install.sh -g
-  cd - || echo "Can't change directory"; exit 1
 )

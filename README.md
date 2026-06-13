@@ -1,128 +1,81 @@
-# Initial-package-install
+# Initial Package Install
 
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/592549f78ae34ef08b21bc91ef122d49)](https://www.codacy.com/manual/Eddinn/initial-package-install?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=eddinn/initial-package-install&amp;utm_campaign=Badge_Grade) [![CircleCI](https://circleci.com/gh/eddinn/initial-package-install.svg?style=svg)](https://circleci.com/gh/eddinn/initial-package-install) ![GitHub issues](https://img.shields.io/github/issues/eddinn/initial-package-install) ![GitHub](https://img.shields.io/github/license/eddinn/initial-package-install)
+Scripts for installing a personal baseline of workstation packages, Snap apps, Python CLI tools, GNOME extensions, VS Code extensions, themes, and dotfiles on Ubuntu and Fedora.
 
-Scripts that installs selective base user packages and extensions for initial setup of users workspase in Ubuntu/Fedora.
+Supported distributions:
 
----
+- Ubuntu, detected by `/etc/os-release` `ID=ubuntu`
+- Fedora, detected by `/etc/os-release` `ID=fedora`
 
-## Files TOC
+## What it does
 
-* Root:
-  * ./initial-package-install.sh
-  * ./post-initial.sh
-* Extensions dir:
-  * ./ext/
-  * ./ext/gnome-ext.sh
-  * ./ext/themes-ext.sh
-  * ./ext/vscode-ext.sh
-  * ./ext/zsh-ext.sh
-* Applications dir:
-  * ./apps/
-  * ./apps/pip.sh
-  * ./apps/snap.sh
-* Dotfiles dir:
-  * ./dots/
-  * ./dots/bash/.profile
-  * ./dots/bash/.bashrc
-  * ./dots/bin/
-  * ./dots/bin/bin/
-  * ./dots/bin/bin/apt-cleanup.sh
-  * ./dots/bin/bin/remove-old-snaps.sh
-  * .dots/git/.gitconfig
-  * .dots/stowit.sh
-  * .dots/zsh/.zshrc
+`initial-package-install.sh` runs as root and installs/updates distro packages plus Chrome and TeamViewer.
 
-### What the scripts do
+`post-initial.sh` runs as your normal user and then calls:
 
-1. The `initial-package-install.sh` script determines what Linux distributin it's running on and installs the predefined base packages and applications
-2. The `post-initial.sh` script installs all predefined snaps and Python3 pip packages, extensions for Gnome-Shell, VSCode and ZSH via supscripts from the `./apps` and `./ext/` dirs, along with running the `stowit.sh` script from the `./dots/` dir, which uses the `stow` command to link the dotfiles in place under `$HOME`
+- `apps/pip-apps.sh` for Python CLI tools through `pipx`
+- `apps/snap-apps.sh` for Snap apps
+- `ext/gnome-ext.sh` for GNOME Shell extensions
+- `ext/themes-ext.sh` for the Qogir theme
+- `ext/vscode-ext.sh` for VS Code extensions
+- `ext/zsh-ext.sh` for Oh My Zsh
+- `dots/stowit.sh` for dotfiles through GNU Stow
 
-### Basic usage
+## Usage
 
-#### If `git` is installed on the system
+### If Git is already installed
 
 ```bash
 git clone https://github.com/eddinn/initial-package-install.git
-cd ./initial-package-install
-# Run the initial install as root with sudo, then post install for snap, pip and extensions
-sudo ./initial-package-install.sh; ./post-initial.sh
-```
-
-#### If `git` is not already installed on the system
-
-```bash
-# Try curl, else fall back to wget
-curl -L -O https://raw.githubusercontent.com/eddinn/initial-package-install/master/initial-package-install.sh || wget -L -O https://raw.githubusercontent.com/eddinn/initial-package-install/master/initial-package-install.sh
+cd initial-package-install
 sudo ./initial-package-install.sh
-
-# Now we have git, so lets clone the repo and finish the install
-rm -Rf ./initial-package-install.sh
-git clone https://github.com/eddinn/initial-package-install.git
-cd ./initial-package-install
 ./post-initial.sh
 ```
 
----
-
-### Dotfiles and the `stowit.sh` script
-
-> **Remember to replace or modify the dotfiles to your needs:**
-
-#### Example usage of the `stow` command
+### If Git is not installed yet
 
 ```bash
+curl -fsSLO https://raw.githubusercontent.com/eddinn/initial-package-install/master/initial-package-install.sh || \
+  wget https://raw.githubusercontent.com/eddinn/initial-package-install/master/initial-package-install.sh
+
+chmod +x ./initial-package-install.sh
+sudo ./initial-package-install.sh
+rm -f ./initial-package-install.sh
+
+git clone https://github.com/eddinn/initial-package-install.git
+cd initial-package-install
+./post-initial.sh
+```
+
+## Dotfiles
+
+Dotfiles live under `dots/` and are linked into `$HOME` with GNU Stow.
+
+Example:
+
+```bash
+cd dots
 stow -v -R -t ~ git
-# Output
-LINK: .gitconfig => ./dots/git/.gitconfig
-ls -latr ~ | grep .git
-# Output
-lrwxrwxrwx  1 USER USER       28 jun 21 16:55 .gitconfig -> ./dots/git/.gitconfig
 ```
 
-> `-v` is verbose, `-R` is recursive, and `-t ~` is the target directory, e.g your Home (`$HOME`) directory.
-
-As you can see, it's relatively straight forward and simple to use..
-In the code above, we will install the git directory for only the local user as root doesn’t need that. However bash which we will do next, can be used for both local users and root. We then create a bash function named stowit to run the actual stow command with our required arguments.
-The first loop is to install folders for any user, and the second has a check to install for any user unless it is the root user. So lets setup the bash directory.
-
-#### Example output from `stowit.sh`
+To stow the configured baseline:
 
 ```bash
-# Run stowit.sh
+cd dots
 ./stowit.sh
-# Output
-Stowing apps for user:
-LINK: .profile => ./dots/bash/.profile
-LINK: .bashrc => ./dots/bash/.bashrc
-LINK: .gitconfig => ./dots/git/.gitconfig
-LINK: .zshrc => ./dots/zsh/.zshrc
-
-All done!
 ```
 
-You can see that stow is pretty smart about linking our files and folders. It linked our new bash files. But when we ran stow again it went through our previously linked git files, re re-linked them. You can actually configure how that handles those situations with different flags. stow will also abort stowing folders when it finds new files that have not been stowed before and will tell you what files so you can fix them.
-
-> **To install the files for root, simply use `sudo`**
+To install the root-compatible dotfiles for root:
 
 ```bash
+cd dots
 sudo ./stowit.sh
 ```
 
-#### The `bin` directory
+The `bin` stow package links scripts from `dots/bin/bin` into `~/bin`. Make sure `~/bin` is in your `PATH`.
 
-Inside the `./dots/bin/bin` folder we can place any binary files and scripts we want to keep around for our system.
+## Notes
 
-#### Add export path to `.zshrc` or `.bashrc`
-
-```bash
-# Example with .zshrc
-vim ~/.zshrc
-export PATH="$HOME/bin:$PATH"
-source ~/.zshrc
-# Lets check and verify our path
-echo $PATH
-/home/USER/bin:/home/USER/.local/bin:/home/USER/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
-```
-
-We now have `/home/USER/bin` in our path where we can use to store all our scripts and files that we need to run in our environment as an alternative to `/usr/local/bin`.
+- The scripts install current distro package names where practical, but package availability still depends on enabled repositories.
+- The VS Code extension list intentionally removes old/deprecated extensions where VS Code now has built-in functionality or a maintained replacement.
+- The Python CLI tools are installed with `pipx` instead of modifying the system Python environment. That avoids modern distro Python packaging headaches. Progress, not self-inflicted pain.
