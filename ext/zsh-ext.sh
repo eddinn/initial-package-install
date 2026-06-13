@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-FORCE_REINSTALL="${FORCE_REINSTALL:-0}"
+FORCE_REINSTALL_OMZ="${FORCE_REINSTALL_OMZ:-0}"
 omz_dir="${HOME}/.oh-my-zsh"
 
 if ! command -v zsh >/dev/null 2>&1; then
@@ -24,13 +24,14 @@ export RUNZSH=no
 export CHSH=no
 export KEEP_ZSHRC=yes
 
-if [[ "$FORCE_REINSTALL" == "1" ]]; then
-  printf '%s\n' "Force reinstalling Oh My Zsh"
-  clone_oh_my_zsh || printf '%s\n' "Could not reinstall Oh My Zsh right now; keeping existing install if present." >&2
-elif [[ -d "$omz_dir" ]]; then
+if [[ -d "$omz_dir" && "$FORCE_REINSTALL_OMZ" != "1" ]]; then
+  printf '%s\n' "Oh My Zsh is already installed; updating in place"
   git -C "$omz_dir" pull --ff-only || printf '%s\n' "Could not update Oh My Zsh right now; continuing." >&2
+elif [[ -d "$omz_dir" && "$FORCE_REINSTALL_OMZ" == "1" ]]; then
+  printf '%s\n' "Force reinstalling Oh My Zsh because FORCE_REINSTALL_OMZ=1"
+  clone_oh_my_zsh || printf '%s\n' "Could not reinstall Oh My Zsh right now; keeping existing install if present." >&2
 else
-  clone_oh_my_zsh
+  clone_oh_my_zsh || printf '%s\n' "Could not install Oh My Zsh right now; continuing." >&2
 fi
 
 if [[ "${SHELL:-}" != "$(command -v zsh)" ]]; then
