@@ -6,8 +6,10 @@ user_only=(
   bin
 )
 
+backup_suffix="backup.initial-package-install.$(date +%Y%m%d%H%M%S)"
+
 detect_shell_package() {
-  local shell_path=${SHELL:-}
+  local shell_path=${DOTFILES_SHELL:-${SHELL:-}}
 
   if [[ -z "$shell_path" ]] && command -v getent >/dev/null 2>&1; then
     shell_path=$(getent passwd "$(id -un)" | awk -F: '{print $7}')
@@ -20,10 +22,32 @@ detect_shell_package() {
   esac
 }
 
+backup_conflicting_targets() {
+  local package=${1:?No stow package supplied}
+  local source
+  local rel
+  local target
+  local backup
+
+  shopt -s dotglob nullglob
+  for source in "${package}"/*; do
+    rel=${source#"${package}/"}
+    target="${HOME}/${rel}"
+
+    if [[ -e "$target" && ! -L "$target" && ! -d "$target" ]]; then
+      backup="${target}.${backup_suffix}"
+      mv "$target" "$backup"
+      printf '%s\n' "Backed up existing target: ${target} -> ${backup}"
+    fi
+  done
+  shopt -u dotglob nullglob
+}
+
 stow_package() {
   local target=${1:?No target directory supplied}
   local package=${2:?No stow package supplied}
 
+  backup_conflicting_targets "$package"
   stow -v -R -t "$target" "$package"
 }
 
