@@ -31,6 +31,16 @@ The old commands `sudo ./initial-package-install.sh` and `./post-initial.sh` sti
 
 A regular run fills in missing components. Use `--upgrade` to update system packages and the managed user apps and extensions. Use `--repair` to rebuild existing pipx environments and refresh GNOME extensions and Oh My Zsh. Failures are listed at the end and produce a nonzero exit status. Independent user components can still finish when another fails. On Ubuntu, if an optional package would cause APT to remove an installed package, the installer skips it, names the proposed removals, and installs the rest of the batch.
 
+### Rerun an existing installation
+
+Close Spotify, Steam, Slack, and VS Code if they are running. From your existing checkout, pull the latest changes and run the system stage.
+
+```bash
+git pull --ff-only && ./initial-package-install.sh --system
+```
+
+Run `./initial-package-install.sh` for both stages.
+
 On Ubuntu, a full run or `--system` replaces the Spotify, Steam, Slack, and VS Code Snaps after the corresponding APT package is installed. The installer saves a Snap snapshot before each removal. Use `sudo snap saved` to find the snapshots. Settings and Steam libraries stored inside a Snap require a separate migration into the APT app.
 
 ## What gets installed
