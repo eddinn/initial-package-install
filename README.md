@@ -1,81 +1,44 @@
 # Initial Package Install
 
-Scripts for installing a personal baseline of workstation packages, Snap apps, Python CLI tools, GNOME extensions, VS Code extensions, themes, and dotfiles on Ubuntu and Fedora.
+Set up an Ubuntu or Fedora workstation with system packages, desktop apps, VS Code extensions, Python CLI tools, GNOME extensions, and dotfiles.
 
-Supported distributions:
+The installer recognizes Ubuntu 24.04 LTS, 26.04 LTS, and 26.10, and Fedora Workstation 44 and 45. The package baseline targets x86-64. Chrome is included on Ubuntu amd64, and the VS Code repository is selected for supported architectures. Some desktop apps depend on which packages and Snap builds are available for your architecture. Fedora Atomic desktops need a different package installation workflow.
 
-- Ubuntu, detected by `/etc/os-release` `ID=ubuntu`
-- Fedora, detected by `/etc/os-release` `ID=fedora`
+## Run the installer
 
-## What it does
-
-`initial-package-install.sh` runs as root and installs/updates distro packages plus Chrome and TeamViewer.
-
-`post-initial.sh` runs as your normal user and then calls:
-
-- `apps/pip-apps.sh` for Python CLI tools through `pipx`
-- `apps/snap-apps.sh` for Snap apps
-- `ext/gnome-ext.sh` for GNOME Shell extensions
-- `ext/themes-ext.sh` for the Qogir theme
-- `ext/vscode-ext.sh` for VS Code extensions
-- `ext/zsh-ext.sh` for Oh My Zsh
-- `dots/stowit.sh` for dotfiles through GNU Stow
-
-## Usage
-
-### If Git is already installed
+Clone the [public GitHub mirror](https://github.com/eddinn/initial-package-install), or use your Forgejo clone URL on the LAN. Run the installer as your normal user.
 
 ```bash
 git clone https://github.com/eddinn/initial-package-install.git
 cd initial-package-install
-sudo ./initial-package-install.sh
-./post-initial.sh
+./initial-package-install.sh
 ```
 
-### If Git is not installed yet
+The installer prompts for sudo for system packages and Snap operations. It uses your user account for pipx, VS Code, GNOME extensions, themes, and dotfiles. You can run either stage separately, from any working directory.
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/eddinn/initial-package-install/master/initial-package-install.sh || \
-  wget https://raw.githubusercontent.com/eddinn/initial-package-install/master/initial-package-install.sh
-
-chmod +x ./initial-package-install.sh
-sudo ./initial-package-install.sh
-rm -f ./initial-package-install.sh
-
-git clone https://github.com/eddinn/initial-package-install.git
-cd initial-package-install
-./post-initial.sh
+./initial-package-install.sh --system
+./initial-package-install.sh --user
+./initial-package-install.sh --user --only=vscode
 ```
 
-## Dotfiles
-
-Dotfiles live under `dots/` and are linked into `$HOME` with GNU Stow.
-
-Example:
+The old commands `sudo ./initial-package-install.sh` and `./post-initial.sh` still run the system and user stages respectively. The scripts under `apps/` and `ext/` also work as shortcuts for their individual components. To bootstrap a system without Git, download and review the installer, then run it with `--system`. Clone the repository before running the user stage so GNU Stow has the dotfiles.
 
 ```bash
-cd dots
-stow -v -R -t ~ git
+./initial-package-install.sh --upgrade
+./initial-package-install.sh --user --repair
 ```
 
-To stow the configured baseline:
+A regular run fills in missing components. Use `--upgrade` to update system packages and the managed user apps and extensions. Use `--repair` to rebuild existing pipx environments and refresh GNOME extensions, Qogir, and Oh My Zsh. Failures are listed at the end and produce a nonzero exit status. Independent user components can still finish when another fails.
 
-```bash
-cd dots
-./stowit.sh
-```
+## What gets installed
 
-To install the root-compatible dotfiles for root:
+- **System packages** use APT or DNF. Chrome on Ubuntu and VS Code on Ubuntu and Fedora use the vendors' signed repositories. Fedora uses RPM Fusion for Steam. Existing Snap editions of Steam and VS Code are kept on reruns.
+- **Snap apps** include GitKraken, Discord, Slack, and Spotify, plus Steam on Ubuntu when Steam is absent. Fedora's system stage enables Snap's socket and configures the classic Snap path. If newly installed Snap launchers are missing from the desktop, log out and back in. A failed refresh is reported and the installed Snap is kept.
+- **Python tools** use pipx for Ansible, ansible-lint, and AWX CLI. WinRM support is installed into Ansible's environment. Fedora 45 uses its packaged Python 3.14 for these environments.
+- **VS Code** installs 18 baseline extensions. Python installs Pylance through its extension pack. Ruby LSP replaces the old Ruby extension. Existing extensions stay installed, including any you added outside the baseline.
+- **GNOME** gets published Dash to Panel and gTile builds matched to the installed GNOME Shell version. After a fresh install, log in again and enable them in GNOME Extensions. The retired Touchpad Indicator and Panel OSD are omitted.
+- **Qogir and Oh My Zsh** install under your account. Qogir uses a fixed upstream revision and leaves the GDM login screen to the distribution theme by default. On supported systems you can opt in with `--gdm`. The pinned Qogir revision ships GDM styles through GNOME 48, so the installer reports and skips GDM theming on GNOME 50 and 51. Oh My Zsh repair backs up the previous installation and carries its `custom/` files forward. Your login shell is yours to select.
+- **Dotfiles** use GNU Stow and point into this checkout, so keep the checkout at a stable path. The installer selects Bash or Zsh based on your login shell. Override that with `DOTFILES_SHELL=bash` or `DOTFILES_SHELL=zsh`. It reports conflicting links and files under `~/bin` before replacing regular top-level dotfiles, and prints the backup directory when it creates one.
 
-```bash
-cd dots
-sudo ./stowit.sh
-```
-
-The `bin` stow package links scripts from `dots/bin/bin` into `~/bin`. Make sure `~/bin` is in your `PATH`.
-
-## Notes
-
-- The scripts install current distro package names where practical, but package availability still depends on enabled repositories.
-- The VS Code extension list intentionally removes old/deprecated extensions where VS Code now has built-in functionality or a maintained replacement.
-- The Python CLI tools are installed with `pipx` instead of modifying the system Python environment. That avoids modern distro Python packaging headaches. Progress, not self-inflicted pain.
+To stow just the configured dotfiles, run `./dots/stowit.sh`. To explicitly stow the root-compatible shell dotfiles, run `sudo -H ./dots/stowit.sh`.

@@ -6,7 +6,6 @@ plugins=(
   git
   docker
   docker-compose
-  django
   npm
   pip
   pyenv

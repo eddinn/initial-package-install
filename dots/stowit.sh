@@ -1,69 +1,81 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-user_only=(
-  git
-  bin
-)
+script=$(realpath -e -- "${BASH_SOURCE[0]}")
+cd -- "${script%/*}"
+command -v stow >/dev/null || { printf 'GNU Stow is required.\n' >&2; exit 1; }
 
-backup_suffix="backup.initial-package-install.$(date +%Y%m%d%H%M%S)"
+shell_path=${DOTFILES_SHELL:-}
+if [[ -z $shell_path ]]; then
+  shell_path=$(getent passwd "$(id -un)" | cut -d: -f7)
+fi
+shell_path=${shell_path:-${SHELL:-}}
 
-detect_shell_package() {
-  local shell_path=${DOTFILES_SHELL:-${SHELL:-}}
+packages=()
+case "${shell_path##*/}" in
+  bash|zsh) packages+=("${shell_path##*/}") ;;
+  *) printf 'No supported login shell found. Set DOTFILES_SHELL=bash or zsh to select its dotfiles.\n' ;;
+esac
+if ((EUID != 0)); then
+  packages+=(git bin)
+fi
+if ((${#packages[@]} == 0)); then
+  exit 0
+fi
 
-  if [[ -z "$shell_path" ]] && command -v getent >/dev/null 2>&1; then
-    shell_path=$(getent passwd "$(id -un)" | awk -F: '{print $7}')
-  fi
-
-  case "${shell_path##*/}" in
-    bash) printf '%s\n' bash ;;
-    zsh) printf '%s\n' zsh ;;
-    *) return 1 ;;
-  esac
-}
-
-backup_conflicting_targets() {
-  local package=${1:?No stow package supplied}
-  local source
-  local rel
-  local target
-  local backup
-
-  shopt -s dotglob nullglob
-  for source in "${package}"/*; do
-    rel=${source#"${package}/"}
-    target="${HOME}/${rel}"
-
-    if [[ -e "$target" && ! -L "$target" && ! -d "$target" ]]; then
-      backup="${target}.${backup_suffix}"
-      mv "$target" "$backup"
-      printf '%s\n' "Backed up existing target: ${target} -> ${backup}"
+# Preflight the conflicts before touching files in the target directory.
+# Only top-level regular files are eligible for automatic backup.
+shopt -s dotglob nullglob
+targets=()
+check_targets() {
+  local package=$1 source=$2 target=$3 child
+  if [[ -L $target ]]; then
+    if [[ $(realpath -m -- "$target") != "$(realpath -m -- "$source")" ]]; then
+      printf 'Stow conflict: %s is an existing symlink.\n' "$target" >&2
+      return 1
     fi
+  elif [[ -d $source && -d $target ]]; then
+    for child in "$source"/*; do
+      check_targets "$package" "$child" "$target/${child##*/}" || return
+    done
+  elif [[ -f $source && -f $target && ${source%/*} == "$package" ]]; then
+    targets+=("$target")
+  elif [[ -e $target ]]; then
+    printf 'Stow conflict: %s already exists.\n' "$target" >&2
+    return 1
+  fi
+}
+for package in "${packages[@]}"; do
+  for source in "$package"/*; do
+    check_targets "$package" "$source" "$HOME/${source##*/}"
   done
-  shopt -u dotglob nullglob
-}
+done
 
-stow_package() {
-  local target=${1:?No target directory supplied}
-  local package=${2:?No stow package supplied}
-
-  backup_conflicting_targets "$package"
-  stow -v -R -t "$target" "$package"
-}
-
-printf '\n%s\n' "Stowing dotfiles for user: $(whoami)"
-
-if shell_package=$(detect_shell_package); then
-  printf '%s\n' "Detected shell package: ${shell_package}"
-  stow_package "$HOME" "$shell_package"
-else
-  printf '%s\n' "No supported shell package detected; skipping shell dotfiles" >&2
+if ((${#targets[@]} == 0)); then
+  exec stow -v -t "$HOME" "${packages[@]}"
 fi
 
-if [[ ${EUID} -ne 0 ]]; then
-  for package in "${user_only[@]}"; do
-    stow_package "$HOME" "$package"
-  done
-fi
-
-printf '\n%s\n' "All done!"
+backup=$(mktemp -d "$HOME/.initial-package-install-dotfiles.XXXXXXXX")
+moved=()
+rollback() {
+  local status=$?
+  if ((status != 0)); then
+    local file
+    for file in "${moved[@]}"; do
+      if [[ ! -e $file && ! -L $file ]]; then
+        mv -T -- "$backup/${file##*/}" "$file" || true
+      fi
+    done
+    rmdir -- "$backup" 2>/dev/null || printf 'Remaining dotfile backups: %s\n' "$backup" >&2
+  fi
+}
+trap rollback EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+for target in "${targets[@]}"; do
+  mv -T -- "$target" "$backup/${target##*/}"
+  moved+=("$target")
+done
+stow --simulate -t "$HOME" "${packages[@]}"
+stow -v -t "$HOME" "${packages[@]}"
+printf 'Saved original dotfiles to %s\n' "$backup"
