@@ -4,10 +4,7 @@ set -euo pipefail
 script_path=$(realpath -e -- "${BASH_SOURCE[0]}")
 repo_dir=$(dirname -- "$script_path")
 readonly script_path repo_dir
-readonly qogir_revision=e7b3146860e5e981a075b4b56facf8e1c2ae5abb
-readonly qogir_sha256=b4545b48e31dce451335f4cab86456dac0fe6594cfd30c116578e2fdebb2bca4
 mode=all
-gdm=0
 upgrade=0
 repair=${FORCE_REINSTALL:-0}
 only=
@@ -15,18 +12,17 @@ failures=()
 
 usage() {
   cat <<'EOF'
-Usage: ./initial-package-install.sh [--system | --user] [--upgrade] [--repair] [--gdm]
+Usage: ./initial-package-install.sh [--system | --user] [--upgrade] [--repair]
 
 Run as your normal user for the full workstation setup. The system stage
 uses sudo. An explicit root invocation runs the system stage only.
 
   --system   Install system packages and configure their repositories.
-  --user     Set up apps, editor and desktop extensions, themes and dotfiles.
+  --user     Set up apps, editor and desktop extensions and dotfiles.
   --upgrade  Also update existing packages, apps and extensions.
   --repair   Repair existing pipx environments, GNOME extensions and Oh My Zsh.
-  --gdm      Opt in to Qogir login-screen theming where upstream supports it.
   --only=NAME  With --user, run one component: pipx, snaps, vscode, gnome,
-               theme, zsh or dotfiles.
+               zsh or dotfiles.
   --help     Show this help.
 EOF
 }
@@ -69,6 +65,31 @@ apt_install() {
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-remove --no-upgrade "$@"
 }
 
+# A single conflicting package can block a whole batch on an existing system.
+# Split only when the simulated transaction would remove installed packages.
+apt_install_available() {
+  local plan failed=0
+  local packages=("$@")
+  if ! plan=$(LC_ALL=C apt-get -s install --no-upgrade "$@" 2>&1); then
+    printf '%s\n' "$plan" >&2
+    return 1
+  fi
+  if ! grep -q '^Remv ' <<<"$plan"; then
+    apt_install "$@"
+    return
+  fi
+  if (($# == 1)); then
+    printf 'Skipped %s. APT would remove: %s\n' "$1" \
+      "$(awk '/^Remv / { print $2 }' <<<"$plan" | paste -sd ',')" >&2
+    return 1
+  fi
+
+  local split=$(($# / 2))
+  apt_install_available "${packages[@]:0:split}" || failed=1
+  apt_install_available "${packages[@]:split}" || failed=1
+  return "$failed"
+}
+
 apt_update() {
   apt-get -o APT::Update::Error-Mode=any update
 }
@@ -103,7 +124,7 @@ install_available_packages() {
   fi
   if ((${#installable[@]})); then
     if [[ $ID == ubuntu ]]; then
-      apt_install "${installable[@]}" || return
+      apt_install_available "${installable[@]}" || return
     else
       dnf -y install "${installable[@]}" || return
     fi
@@ -113,6 +134,7 @@ install_available_packages() {
 
 configure_apt_repo() (
   local name=$1 source_name=$2 uri=$3 arches=$4 key_url=$5
+  local component=${6:-main} suite=${7:-stable}
   local keyring="/etc/apt/keyrings/$name.gpg" temp existing=0
   if grep -qsF -- "$uri" /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; then
     printf 'Found an existing APT source for %s.\n' "$name"
@@ -128,15 +150,20 @@ configure_apt_repo() (
     install -m 0644 "$temp/key.gpg" "$keyring" || return
   fi
   if ((!existing)); then
-    cat >"$temp/source" <<EOF || return
+    if [[ $source_name == *.list ]]; then
+      printf 'deb [arch=%s signed-by=%s] %s %s %s\n' \
+        "$arches" "$keyring" "$uri" "$suite" "$component" >"$temp/source" || return
+    else
+      cat >"$temp/source" <<EOF || return
 Types: deb
 URIs: $uri
-Suites: stable
-Components: main
+Suites: $suite
+Components: $component
 Architectures: $arches
 Signed-By: $keyring
 EOF
-    install -m 0644 "$temp/source" "/etc/apt/sources.list.d/$source_name.sources" || return
+    fi
+    install -m 0644 "$temp/source" "/etc/apt/sources.list.d/$source_name" || return
   fi
 )
 
@@ -176,6 +203,46 @@ snap_installed() {
   command -v snap >/dev/null && timeout 5s snap list "$1" >/dev/null 2>&1
 }
 
+remove_snap_with_snapshot() {
+  local name=$1
+  # Keep an explicit snapshot even if automatic snapshots are disabled.
+  snap save "$name" || return
+  snap remove --purge "$name"
+}
+
+replace_apt_snap() {
+  local installed=$1 name=$2 package
+  shift 2
+  if ! awk -v name="$name" '$1 == name { found = 1 } END { exit !found }' <<<"$installed"; then
+    return 0
+  fi
+  for package; do
+    if package_installed "$package"; then
+      run_step "Replace $name Snap with $package" remove_snap_with_snapshot "$name"
+      return
+    fi
+  done
+  printf 'Keeping the %s Snap because its APT replacement is missing.\n' "$name" >&2
+}
+
+migrate_ubuntu_snaps() {
+  local arch=$1 installed
+  if ! command -v snap >/dev/null ||
+    [[ ! -S /run/snapd.socket && ! -f /var/lib/snapd/state.json ]]; then
+    return 0
+  fi
+  installed=$(LC_ALL=C timeout 15s snap list --all) || return
+
+  case "$arch" in
+    amd64|arm64|armhf) replace_apt_snap "$installed" code code ;;
+  esac
+  if [[ $arch == amd64 ]]; then
+    replace_apt_snap "$installed" spotify spotify-client
+    replace_apt_snap "$installed" slack slack-desktop
+    replace_apt_snap "$installed" steam steam-launcher steam-installer
+  fi
+}
+
 prepare_fedora_snaps() {
   if [[ $(readlink -f /snap 2>/dev/null) != /var/lib/snapd/snap ]]; then
     if [[ -e /snap || -L /snap ]]; then
@@ -187,40 +254,114 @@ prepare_fedora_snaps() {
   systemctl enable --now snapd.socket
 }
 
+install_ubuntu_steam_key() (
+  local temp
+  temp=$(mktemp -d) || return
+  trap 'rm -rf -- "$temp"' EXIT
+  download https://repo.steampowered.com/steam/archive/stable/steam.gpg "$temp/steam.gpg" || return
+  install -m 0644 "$temp/steam.gpg" /usr/share/keyrings/steam.gpg
+)
+
+configure_ubuntu_steam() {
+  local uri=https://repo.steampowered.com/steam/
+  local keyring=/usr/share/keyrings/steam.gpg
+  local source=/etc/apt/sources.list.d/steam-stable.list
+  if ! dpkg --print-foreign-architectures | grep -Fxq i386; then
+    dpkg --add-architecture i386 || return
+  fi
+  if grep -qsF -- "$uri stable steam" /etc/apt/sources.list /etc/apt/sources.list.d/*.list ||
+    grep -qsF -- "$uri" /etc/apt/sources.list.d/*.sources; then
+    printf 'Found an existing APT source for Steam.\n'
+    return 0
+  fi
+  if [[ -e $source ]]; then
+    printf 'Steam source already exists at %s. Review it before enabling the stable repository.\n' "$source" >&2
+    return 1
+  fi
+
+  # Match the source and keyring shipped by Valve's steam-launcher package.
+  install_ubuntu_steam_key || return
+  install -m 0644 /dev/stdin "$source" <<EOF
+deb [arch=amd64,i386 signed-by=$keyring] $uri stable steam
+deb-src [arch=amd64,i386 signed-by=$keyring] $uri stable steam
+EOF
+}
+
+install_ubuntu_slack() {
+  # Slack's daily job would add a second APT source and globally trusted keys.
+  if [[ -f /etc/apt/sources.list.d/workstation-slack.sources && ! -e /etc/default/slack ]]; then
+    install -m 0644 /dev/stdin /etc/default/slack <<'EOF' || return
+repo_add_once="false"
+repo_reenable_on_distupgrade="false"
+EOF
+  fi
+  # Slack recommends the PulseAudio server first. Use the ALSA library with
+  # the system's existing audio server.
+  apt_install --no-install-recommends slack-desktop libasound2t64
+}
+
+install_ubuntu_desktop_apps() {
+  local need_steam=0
+  # Spotify's installer only recognizes .list entries and creates one otherwise.
+  run_step "Configure Spotify repository" configure_apt_repo \
+    spotify spotify.list https://repository.spotify.com amd64 \
+    https://download.spotify.com/debian/pubkey_5384CE82BA52C83A.asc non-free
+  run_step "Configure Slack repository" configure_apt_repo \
+    slack workstation-slack.sources https://packagecloud.io/slacktechnologies/slack/debian/ amd64 \
+    https://packagecloud.io/slacktechnologies/slack/gpgkey main jessie
+  if ! package_installed steam-installer && ! package_installed steam-launcher; then
+    need_steam=1
+    run_step "Configure Steam repository" configure_ubuntu_steam
+  fi
+
+  log "Refreshing Ubuntu desktop app indexes"
+  apt_update || return
+  if ((need_steam)); then
+    run_step "Install Steam and its graphics libraries" apt_install \
+      steam-launcher steam-libs-amd64 steam-libs-i386:i386
+  fi
+  run_step "Install Spotify" install_available_packages spotify-client
+  if ! package_installed slack-desktop; then
+    run_step "Install Slack" install_ubuntu_slack
+  fi
+}
+
 system_ubuntu() {
   local arch vendor_packages=()
   local optional=(
     audacity autoconf automake autopoint autotools-dev bash-completion bind9-dnsutils
     chkrootkit default-jre default-mysql-client filezilla fonts-powerline gamemode gettext
-    gnome-browser-connector gnome-tweaks golang-go jq lame make mkchromecast
+    gnome-browser-connector gnome-tweaks golang-go jq lame make
     nfs-kernel-server nmap nodejs npm openssh-server pkg-config powerline puppet
     puppet-lint python3-pip python3-venv qbittorrent remmina rkhunter rsync
-    sassc gtk2-engines-murrine shellcheck snapd unattended-upgrades unzip vim vlc zip
+    shellcheck snapd unattended-upgrades unzip vim vlc zip
   )
 
+  # Removing Valve's launcher can leave its APT source without its keyring.
+  if [[ ! -s /usr/share/keyrings/steam.gpg ]] &&
+    grep -qsF 'signed-by=/usr/share/keyrings/steam.gpg] https://repo.steampowered.com/steam/ stable steam' \
+      /etc/apt/sources.list.d/steam-stable.list; then
+    log "Restore the Steam APT signing key"
+    install_ubuntu_steam_key || return
+  fi
   log "Refreshing Ubuntu package indexes"
   apt_update || return
   log "Installing setup dependencies"
   apt_install ca-certificates curl gnupg git pipx python3 stow zsh zsh-syntax-highlighting || return
-  if ((gdm)) && [[ $VERSION_ID == 24.04 ]]; then
-    run_step "Install Qogir GDM dependencies" apt_install libglib2.0-dev-bin
-  fi
 
   arch=$(dpkg --print-architecture)
   if [[ $arch == amd64 ]]; then
     run_step "Configure Google Chrome repository" configure_apt_repo \
-      google-linux google-chrome https://dl.google.com/linux/chrome/deb/ amd64 \
+      google-linux google-chrome.sources https://dl.google.com/linux/chrome/deb/ amd64 \
       https://dl.google.com/linux/linux_signing_key.pub
     vendor_packages+=(google-chrome-stable)
   fi
   case "$arch" in
     amd64|arm64|armhf)
-      if ! snap_installed code; then
-        run_step "Configure Microsoft VS Code repository" configure_apt_repo \
-          microsoft vscode https://packages.microsoft.com/repos/code "$arch" \
-          https://packages.microsoft.com/keys/microsoft.asc
-        vendor_packages+=(code)
-      fi
+      run_step "Configure Microsoft VS Code repository" configure_apt_repo \
+        microsoft vscode.sources https://packages.microsoft.com/repos/code "$arch" \
+        https://packages.microsoft.com/keys/microsoft.asc
+      vendor_packages+=(code)
       ;;
   esac
 
@@ -234,15 +375,19 @@ system_ubuntu() {
   if ((${#vendor_packages[@]})); then
     run_step "Install Ubuntu vendor packages" install_available_packages "${vendor_packages[@]}"
   fi
+  if [[ $arch == amd64 ]]; then
+    run_step "Install Ubuntu desktop apps" install_ubuntu_desktop_apps
+  fi
+  run_step "Replace Ubuntu Snaps with installed APT editions" migrate_ubuntu_snaps "$arch"
 }
 
 system_fedora() {
   local arch vendor_packages=() optional=(
     audacity autoconf automake bash-completion bind-utils chkrootkit filezilla gamemode
-    gettext-devel gnome-browser-connector gnome-tweaks golang gtk-murrine-engine
+    gettext-devel gnome-browser-connector gnome-tweaks golang
     java-latest-openjdk jq lame libnfsidmap make mariadb nfs-utils nmap nodejs24-npm-bin
     openssh-server pkgconf-pkg-config powerline powerline-fonts puppet python3-pip
-    qbittorrent remmina rkhunter rsync sassc ShellCheck snapd unzip vim-enhanced vlc zip
+    qbittorrent remmina rkhunter rsync ShellCheck snapd unzip vim-enhanced vlc zip
   )
   log "Refreshing Fedora package indexes"
   dnf makecache --refresh || return
@@ -415,21 +560,20 @@ setup_snaps() {
   arch=$(uname -m) || return
   case "$arch" in x86_64|aarch64) snaps+=(gitkraken) ;; esac
   if [[ $arch == x86_64 ]]; then
-    snaps+=(discord slack spotify)
-  else
-    printf 'Discord, Slack and Spotify Snaps are only in the x86-64 baseline.\n'
+    snaps+=(discord)
+    if [[ $ID == fedora ]]; then
+      snaps+=(slack spotify)
+    fi
   fi
   if ! command -v snap >/dev/null || ! timeout 25s snap version >/dev/null; then
     printf 'Snap is unavailable. Run the system stage and check that snapd is running.\n' >&2
     return 1
   fi
   sudo timeout 90s snap wait system seed.loaded || return
-  if snap_installed steam ||
-    { [[ $ID == ubuntu && $arch == x86_64 ]] && ! package_installed steam &&
-      ! package_installed steam-installer && ! package_installed steam-launcher; }; then
+  if [[ $ID == fedora ]] && snap_installed steam; then
     snaps+=(steam)
   fi
-  if snap_installed code; then
+  if ! package_installed code && snap_installed code; then
     snaps+=(code)
   fi
   installed=$(snap list) || return
@@ -609,91 +753,6 @@ setup_gnome_extensions() {
   return "$failed"
 }
 
-fetch_qogir() {
-  local stage=$1
-  download "https://codeload.github.com/vinceliuice/Qogir-theme/tar.gz/$qogir_revision" "$stage/source.tar.gz" || return
-  printf '%s  %s\n' "$qogir_sha256" "$stage/source.tar.gz" | sha256sum --check --status || {
-    printf 'Qogir source checksum did not match.\n' >&2
-    return 1
-  }
-  tar -xzf "$stage/source.tar.gz" --strip-components=1 -C "$stage/source"
-}
-
-install_qogir() (
-  local themes_dir="${XDG_DATA_HOME:-$HOME/.local/share}/themes"
-  local stage theme prepared
-  if ! command -v gnome-shell >/dev/null; then
-    printf 'GNOME Shell is absent. Skipping Qogir.\n'
-    return 0
-  fi
-  if ((!repair)); then
-    if ((!upgrade)) && [[ -f $themes_dir/Qogir/index.theme || -f $HOME/.themes/Qogir/index.theme ]]; then
-      printf 'Qogir is already installed.\n'
-      return 0
-    fi
-    if [[ -r $themes_dir/Qogir/.initial-package-install-revision &&
-      $(<"$themes_dir/Qogir/.initial-package-install-revision") == "$qogir_revision" ]]; then
-      printf 'Qogir is at the configured revision.\n'
-      return 0
-    fi
-  fi
-  command -v sassc >/dev/null || { printf 'Install sassc before installing Qogir.\n' >&2; return 1; }
-  mkdir -p -- "$themes_dir" || return
-  # Upstream does not quote its source and destination paths.
-  stage=$(mktemp -d /tmp/initial-package-install-qogir.XXXXXXXX) || return
-  trap 'rm -rf -- "$stage"' EXIT
-  mkdir -- "$stage/source" "$stage/output" "$stage/home" || return
-  fetch_qogir "$stage" || return
-  (
-    cd "$stage/source" || exit
-    HOME="$stage/home" XDG_DATA_HOME="$stage/home" bash ./install.sh -d "$stage/output"
-  ) || return
-  [[ -s $stage/output/Qogir/index.theme && -s $stage/output/Qogir-Dark/index.theme &&
-    -s $stage/output/Qogir-Dark/gtk-3.0/gtk.css ]] || {
-    printf 'Qogir did not generate the expected themes.\n' >&2
-    return 1
-  }
-  printf '%s\n' "$qogir_revision" >"$stage/output/Qogir/.initial-package-install-revision" || return
-  prepared=$(mktemp -d "$themes_dir/.qogir.XXXXXXXX") || return
-  trap 'rm -rf -- "$stage" "$prepared"' EXIT
-  cp -a -- "$stage/output/." "$prepared" || return
-  for theme in "$prepared"/Qogir*; do
-    replace_with_backup "$theme" "$themes_dir/${theme##*/}" || return
-  done
-)
-
-# The upstream GDM installer rewrites system GNOME resources. It only ships
-# dedicated Shell styles through 48, so keep newer login screens untouched.
-setup_qogir_gdm() {
-  local version
-  version=$(gnome-shell --version) || return
-  if [[ ! $version =~ ([0-9]+)\. ]] || ((BASH_REMATCH[1] > 48)); then
-    printf 'Qogir has no dedicated GDM style for %s. The login screen was left alone.\n' "$version" >&2
-    return 1
-  fi
-  command -v glib-compile-resources >/dev/null || {
-    printf 'Install the GLib development tools with --system --gdm first.\n' >&2
-    return 1
-  }
-  sudo bash -c '
-    set -euo pipefail
-    stage=$(mktemp -d /var/tmp/initial-package-install-gdm.XXXXXXXX)
-    trap "rm -rf -- \"\$stage\"" EXIT
-    curl -fsSL --proto "=https" --proto-redir "=https" --max-time 180 "$1" -o "$stage/source.tar.gz"
-    printf "%s  %s\n" "$2" "$stage/source.tar.gz" | sha256sum --check --status
-    mkdir "$stage/source"
-    tar -xzf "$stage/source.tar.gz" --strip-components=1 --directory="$stage/source"
-    cd "$stage/source"
-    # Relocate the pinned installer’s fixed /tmp staging path to this
-    # root-owned directory before invoking its GDM mode.
-    sed -i "s|local THEME_TEMP=\"/tmp/|local THEME_TEMP=\"$stage/|" install.sh
-    if grep -q "local THEME_TEMP=\"/tmp/" install.sh; then
-      exit 1
-    fi
-    bash ./install.sh -g
-  ' bash "https://codeload.github.com/vinceliuice/Qogir-theme/tar.gz/$qogir_revision" "$qogir_sha256"
-}
-
 setup_oh_my_zsh() (
   local dest="$HOME/.oh-my-zsh" stage
   local omz_repair=${FORCE_REINSTALL_OMZ:-$repair} login_shell
@@ -728,10 +787,6 @@ setup_user() {
   if [[ -z $only || $only == snaps ]]; then run_step "Set up Snap apps" setup_snaps; fi
   if [[ -z $only || $only == vscode ]]; then run_step "Set up VS Code extensions" setup_vscode_extensions; fi
   if [[ -z $only || $only == gnome ]]; then run_step "Set up GNOME extensions" setup_gnome_extensions; fi
-  if [[ -z $only || $only == theme ]]; then
-    run_step "Set up the user Qogir theme" install_qogir
-    if ((gdm)); then run_step "Set up the Qogir login screen" setup_qogir_gdm; fi
-  fi
   if [[ -z $only || $only == zsh ]]; then run_step "Set up Oh My Zsh" setup_oh_my_zsh; fi
   if [[ -z $only || $only == dotfiles ]]; then run_step "Stow dotfiles" bash "$repo_dir/dots/stowit.sh"; fi
 }
@@ -746,19 +801,15 @@ main() {
         ;;
       --upgrade) upgrade=1 ;;
       --repair) repair=1 ;;
-      --gdm) gdm=1 ;;
       --only=*) only=${arg#--only=}; [[ -n $only ]] || die "Specify a component after --only=." ;;
       --help|-h) usage; return 0 ;;
       *) die "Unknown option: $arg" ;;
     esac
   done
   [[ $repair == 0 || $repair == 1 ]] || die "FORCE_REINSTALL must be 0 or 1."
-  if ((gdm)) && [[ -n $only && $only != theme ]]; then
-    die "--gdm can only be combined with --only=theme."
-  fi
   case "$only" in
     '') ;;
-    pipx|snaps|vscode|gnome|theme|zsh|dotfiles) [[ $mode == user ]] || die "--only requires --user." ;;
+    pipx|snaps|vscode|gnome|zsh|dotfiles) [[ $mode == user ]] || die "--only requires --user." ;;
     *) die "Unknown user component: $only" ;;
   esac
 
@@ -791,9 +842,9 @@ main() {
     if [[ $mode != user ]]; then
       local -a system_args=(--system)
       if ((upgrade)); then system_args+=(--upgrade); fi
-      if ((gdm)); then system_args+=(--gdm); fi
       # Copy just the reviewed script into a root-owned location before it
       # runs, so subsequent edits to the checkout cannot change the root stage.
+      # shellcheck disable=SC2016
       run_step "Install system packages" sudo bash -c '
         set -eu
         stage=$(mktemp -d)
